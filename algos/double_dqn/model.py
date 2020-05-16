@@ -10,6 +10,7 @@ After ~1500 steps, you will see the total_reward hitting the max score of 200. O
 see the metrics:
 tensorboard --logdir default
 """
+import random
 
 import pytorch_lightning as pl
 
@@ -201,7 +202,7 @@ def main(hparams) -> None:
     trainer = pl.Trainer(
         gpus=1,
         distributed_backend='dp',
-        max_epochs=10000,
+        max_epochs=1000000,
         val_check_interval=100
     )
 
@@ -209,8 +210,9 @@ def main(hparams) -> None:
 
 
 if __name__ == '__main__':
-    torch.manual_seed(0)
-    np.random.seed(0)
+    torch.manual_seed(123)
+    np.random.seed(123)
+    random.seed(123)
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch_size", type=int, default=32, help="size of the batches")
@@ -219,7 +221,7 @@ if __name__ == '__main__':
     parser.add_argument("--gamma", type=float, default=0.99, help="discount factor")
     parser.add_argument("--sync_rate", type=int, default=1000,
                         help="how many frames do we update the target network")
-    parser.add_argument("--replay_size", type=int, default=10000,
+    parser.add_argument("--replay_size", type=int, default=100000,
                         help="capacity of the replay buffer")
     parser.add_argument("--warm_start_size", type=int, default=10000,
                         help="how many samples do we use to fill our buffer at the start of training")
@@ -227,12 +229,15 @@ if __name__ == '__main__':
                         help="what frame should epsilon stop decaying")
     parser.add_argument("--eps_start", type=float, default=1.0, help="starting value of epsilon")
     parser.add_argument("--eps_end", type=float, default=0.02, help="final value of epsilon")
-    parser.add_argument("--episode_length", type=int, default=200, help="max length of an episode")
-    parser.add_argument("--max_episode_reward", type=int, default=21,
+    parser.add_argument("--episode_length", type=int, default=500, help="max length of an episode")
+    parser.add_argument("--max_episode_reward", type=int, default=18,
                         help="max episode reward in the environment")
     parser.add_argument("--warm_start_steps", type=int, default=10000,
                         help="max episode reward in the environment")
+    parser.add_argument("--max_epochs", type=int, default=1000000,
+                        help="max epochs to train the agent")
 
     args, _ = parser.parse_known_args()
 
     main(args)
+

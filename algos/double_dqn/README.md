@@ -53,6 +53,19 @@ In order to update the original DQN to DoubleDQN we need to do the following
         return nn.MSELoss()(state_action_values, expected_state_action_values)
 ````
 
-# References
+## Results
+
+### Double DQN Results
+![Double DQN Results](../../docs/images/pong_double_dqn_baseline_results.png)
+
+### DQN vs Double DQN
+
+orange: DQN
+
+blue: Double DQN
+
+![Double DQN Results](../../docs/images/dqn_ddqn_comparison.png)
+
+## References
 
 [Deep Reinforcement Learning with Double Q-learning](https://arxiv.org/pdf/1509.06461.pdf)
