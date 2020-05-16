@@ -1,3 +1,5 @@
+"""Core functions for DQN Methods"""
+
 from typing import Tuple
 import numpy as np
 import gym
@@ -24,8 +26,12 @@ class RLDataset(IterableDataset):
 
     def __iter__(self) -> Tuple:
         states, actions, rewards, dones, new_states = self.buffer.sample(self.sample_size)
-        for i in range(len(dones)):
-            yield states[i], actions[i], rewards[i], dones[i], new_states[i]
+        for idx, _ in enumerate(dones):
+            yield states[idx], actions[idx], rewards[idx], dones[idx], new_states[idx]
+
+    def __getitem__(self, item):
+        """Not used"""
+        return None
 
 
 class Agent:
@@ -75,7 +81,10 @@ class Agent:
         return action
 
     @torch.no_grad()
-    def play_step(self, net: nn.Module, epsilon: float = 0.0, device: str = 'cpu', render: bool = False) -> Tuple[float, bool]:
+    def play_step(self, net: nn.Module,
+                  epsilon: float = 0.0,
+                  device: str = 'cpu',
+                  render: bool = False) -> Tuple[float, bool]:
         """
         Carries out a single interaction step between the agent and the environment
 

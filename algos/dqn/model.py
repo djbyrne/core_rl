@@ -10,23 +10,16 @@ After ~1500 steps, you will see the total_reward hitting the max score of 200. O
 see the metrics:
 tensorboard --logdir default
 """
-import random
-
-import pytorch_lightning as pl
 
 from typing import Tuple, List
-
 import argparse
-from collections import OrderedDict, deque, namedtuple
-
-import gym
-import numpy as np
+from collections import OrderedDict
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
-
+import pytorch_lightning as pl
 from algos.common import wrappers
 from algos.common.memory import ReplayBuffer
 from algos.common.networks import CNN
@@ -43,20 +36,28 @@ class DQNLightning(pl.LightningModule):
         self.env = wrappers.make_env(self.hparams.env)
         self.env.seed(123)
 
-        obs_shape = self.env.observation_space.shape
-        n_actions = self.env.action_space.n
+        self.obs_shape = self.env.observation_space.shape
+        self.n_actions = self.env.action_space.n
 
-        self.net = CNN(obs_shape, n_actions)
-        self.target_net = CNN(obs_shape, n_actions)
+        self.net = None
+        self.target_net = None
+        self.build_networks()
 
         self.buffer = ReplayBuffer(self.hparams.replay_size)
         self.agent = Agent(self.env, self.buffer)
+
         self.total_reward = 0
         self.episode_reward = 0
         self.episode_count = 0
         self.episode_steps = 0
         self.total_episode_steps = 0
+
         self.populate(self.hparams.warm_start_steps)
+
+    def build_networks(self) -> None:
+        """Initializes the DQN train and target networks"""
+        self.net = CNN(self.obs_shape, self.n_actions)
+        self.target_net = CNN(self.obs_shape, self.n_actions)
 
     def populate(self, steps: int = 1000) -> None:
         """
@@ -66,7 +67,7 @@ class DQNLightning(pl.LightningModule):
         Args:
             steps: number of random steps to populate the buffer with
         """
-        for i in range(steps):
+        for _ in range(steps):
             self.agent.play_step(self.net, epsilon=1.0)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -82,7 +83,7 @@ class DQNLightning(pl.LightningModule):
         output = self.net(x)
         return output
 
-    def dqn_mse_loss(self, batch: Tuple[torch.Tensor, torch.Tensor]) -> torch.Tensor:
+    def loss(self, batch: Tuple[torch.Tensor, torch.Tensor]) -> torch.Tensor:
         """
         Calculates the mse loss using a mini batch from the replay buffer
 
@@ -105,14 +106,14 @@ class DQNLightning(pl.LightningModule):
 
         return nn.MSELoss()(state_action_values, expected_state_action_values)
 
-    def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor], nb_batch) -> OrderedDict:
+    def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor], _) -> OrderedDict:
         """
         Carries out a single step through the environment to update the replay buffer.
         Then calculates loss based on the minibatch recieved
 
         Args:
             batch: current mini batch of replay data
-            nb_batch: batch number
+            _: batch number, not used
 
         Returns:
             Training loss and log metrics
@@ -127,7 +128,7 @@ class DQNLightning(pl.LightningModule):
         self.episode_steps += 1
 
         # calculates training loss
-        loss = self.dqn_mse_loss(batch)
+        loss = self.loss(batch)
 
         if self.trainer.use_dp or self.trainer.use_ddp2:
             loss = loss.unsqueeze(0)
@@ -144,7 +145,6 @@ class DQNLightning(pl.LightningModule):
             self.target_net.load_state_dict(self.net.state_dict())
 
         log = {'total_reward': torch.tensor(self.total_reward).to(device),
-               'reward': torch.tensor(reward).to(device),
                'train_loss': loss,
                'episode_steps': torch.tensor(self.total_episode_steps)
                }
@@ -178,49 +178,43 @@ class DQNLightning(pl.LightningModule):
         """Retrieve device currently being used by minibatch"""
         return batch[0].device.index if self.on_gpu else 'cpu'
 
+    @staticmethod
+    def add_model_specific_args(parent) -> argparse.ArgumentParser:
+        """
+        Adds arguments for DQN model
 
-def main(hparams) -> None:
-    model = DQNLightning(hparams)
+        Note: these params are fine tuned for Pong env
 
-    trainer = pl.Trainer(
-        gpus=1,
-        distributed_backend='dp',
-        max_epochs=hparams.max_epochs,
-        early_stop_callback=False,
-        val_check_interval=1000
-    )
+        Args:
+            parent
+        """
+        arg_parser = argparse.ArgumentParser(parents=[parent])
 
-    trainer.fit(model)
-
-
-if __name__ == '__main__':
-    torch.manual_seed(123)
-    np.random.seed(123)
-    random.seed(123)
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--batch_size", type=int, default=32, help="size of the batches")
-    parser.add_argument("--lr", type=float, default=1e-4, help="learning rate")
-    parser.add_argument("--env", type=str, default="CartPole-v0", help="gym environment tag")
-    parser.add_argument("--gamma", type=float, default=0.99, help="discount factor")
-    parser.add_argument("--sync_rate", type=int, default=1000,
-                        help="how many frames do we update the target network")
-    parser.add_argument("--replay_size", type=int, default=100000,
-                        help="capacity of the replay buffer")
-    parser.add_argument("--warm_start_size", type=int, default=10000,
-                        help="how many samples do we use to fill our buffer at the start of training")
-    parser.add_argument("--eps_last_frame", type=int, default=150000,
-                        help="what frame should epsilon stop decaying")
-    parser.add_argument("--eps_start", type=float, default=1.0, help="starting value of epsilon")
-    parser.add_argument("--eps_end", type=float, default=0.02, help="final value of epsilon")
-    parser.add_argument("--episode_length", type=int, default=500, help="max length of an episode")
-    parser.add_argument("--max_episode_reward", type=int, default=18,
-                        help="max episode reward in the environment")
-    parser.add_argument("--warm_start_steps", type=int, default=10000,
-                        help="max episode reward in the environment")
-    parser.add_argument("--max_epochs", type=int, default=1000000,
-                        help="max epochs to train the agent")
-
-    args, _ = parser.parse_known_args()
-
-    main(args)
+        arg_parser.add_argument("--batch_size", type=int, default=32, help="size of the batches")
+        arg_parser.add_argument("--lr", type=float, default=1e-4, help="learning rate")
+        arg_parser.add_argument("--env", type=str, default="PongNoFrameskip-v4", help="gym environment tag")
+        arg_parser.add_argument("--gamma", type=float, default=0.99, help="discount factor")
+        arg_parser.add_argument("--sync_rate", type=int, default=1000,
+                                help="how many frames do we update the target network")
+        arg_parser.add_argument("--replay_size", type=int, default=100000,
+                                help="capacity of the replay buffer")
+        arg_parser.add_argument("--warm_start_size", type=int, default=10000,
+                                help="how many samples do we use to fill our buffer at the start of training")
+        arg_parser.add_argument("--eps_last_frame", type=int, default=150000,
+                                help="what frame should epsilon stop decaying")
+        arg_parser.add_argument("--eps_start", type=float, default=1.0, help="starting value of epsilon")
+        arg_parser.add_argument("--eps_end", type=float, default=0.02, help="final value of epsilon")
+        arg_parser.add_argument("--episode_length", type=int, default=500, help="max length of an episode")
+        arg_parser.add_argument("--max_episode_reward", type=int, default=18,
+                                help="max episode reward in the environment")
+        arg_parser.add_argument("--warm_start_steps", type=int, default=10000,
+                                help="max episode reward in the environment")
+        arg_parser.add_argument("--max_steps", type=int, default=500000,
+                                help="max steps to train the agent")
+        arg_parser.add_argument("--gpus", type=int, default=1,
+                                help="number of gpus to use for training")
+        arg_parser.add_argument("--seed", type=int, default=123,
+                                help="seed for training run")
+        arg_parser.add_argument("--backend", type=str, default="dp",
+                                help="distributed backend to be used by lightning")
+        return arg_parser

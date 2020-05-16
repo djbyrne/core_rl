@@ -61,3 +61,35 @@ In order to update the basic DQN to a Dueling DQN we need to do the following
         return self.fc_adv(conv_out), self.fc_val(conv_out)
 ````
 
+## Results
+
+The results below a noticeable improvement from the original DQN network. 
+
+#### Pong - Dueling DQN
+
+Similar to the results of the DQN baseline, the agent has a period where the number of steps per episodes increase as 
+it begins to 
+hold its own against the heuristic oppoent, but then the steps per episode quickly begins to drop as it gets better 
+and starts to 
+beat its opponent faster and faster. There is a noticable point at step ~250k where the agent goes from losing to
+winning.
+
+As you can see by the total rewards, the dueling network's training progression is very stable and continues to trend 
+upward until it finally plateus. 
+
+![Dueling DQN Results](../../docs/images/pong_dueling_dqn_results.png)
+
+#### DQN vs Dueling DQN 
+
+In comparison to the base DQN, we see that the Dueling network's training is much more stable and is able to reach a
+score in the high teens faster than the DQN agent. Even though the Dueling network is more stable and out performs DQN
+early in training, by the end of training the two networks end up at the same point.
+
+This could very well be due to the simplicity of the Pong environment. 
+
+ - Orange: DQN
+
+ - Red: Dueling DQN
+
+![Dueling DQN Results](../../docs/images/pong_dueling_dqn_comparison.png)
+

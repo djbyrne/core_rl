@@ -1,10 +1,9 @@
 """Series of memory buffers sued"""
 
 # Named tuple for storing experience steps gathered in training
+from typing import Tuple
 from collections import deque, namedtuple
 import numpy as np
-
-from typing import Tuple
 
 Experience = namedtuple(
     'Experience', field_names=['state', 'action', 'reward',
@@ -35,6 +34,14 @@ class ReplayBuffer:
         self.buffer.append(experience)
 
     def sample(self, batch_size: int) -> Tuple:
+        """
+        Takes a sample of the buffer
+        Args:
+            batch_size: current batch_size
+
+        Returns:
+            a batch of tuple np arrays of Experiences
+        """
         indices = np.random.choice(len(self.buffer), batch_size, replace=False)
         states, actions, rewards, dones, next_states = zip(*[self.buffer[idx] for idx in indices])
 
