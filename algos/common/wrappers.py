@@ -11,6 +11,7 @@ import gym.spaces
 
 class FireResetEnv(gym.Wrapper):
     """For environments where the user need to press FIRE for the game to start."""
+
     def __init__(self, env=None):
         super(FireResetEnv, self).__init__(env)
         assert env.unwrapped.get_action_meanings()[1] == 'FIRE'
@@ -64,10 +65,10 @@ class MaxAndSkipEnv(gym.Wrapper):
 
 class ProcessFrame84(gym.ObservationWrapper):
     """preprocessing images from env"""
+
     def __init__(self, env=None):
         super(ProcessFrame84, self).__init__(env)
-        self.observation_space = gym.spaces.Box(
-            low=0, high=255, shape=(84, 84, 1), dtype=np.uint8)
+        self.observation_space = gym.spaces.Box(low=0, high=255, shape=(84, 84, 1), dtype=np.uint8)
 
     def observation(self, obs):
         """preprocess the obs"""
@@ -84,8 +85,7 @@ class ProcessFrame84(gym.ObservationWrapper):
                 np.float32)
         else:
             assert False, "Unknown resolution."
-        img = img[:, :, 0] * 0.299 + img[:, :, 1] * 0.587 + \
-              img[:, :, 2] * 0.114
+        img = img[:, :, 0] * 0.299 + img[:, :, 1] * 0.587 + img[:, :, 2] * 0.114
         resized_screen = cv2.resize(
             img, (84, 110), interpolation=cv2.INTER_AREA)
         x_t = resized_screen[18:102, :]
@@ -95,6 +95,7 @@ class ProcessFrame84(gym.ObservationWrapper):
 
 class ImageToPyTorch(gym.ObservationWrapper):
     """converts image to pytorch format"""
+
     def __init__(self, env):
         super(ImageToPyTorch, self).__init__(env)
         old_shape = self.observation_space.shape
@@ -102,19 +103,23 @@ class ImageToPyTorch(gym.ObservationWrapper):
         self.observation_space = gym.spaces.Box(
             low=0.0, high=1.0, shape=new_shape, dtype=np.float32)
 
-    def observation(self, observation):
+    @staticmethod
+    def observation(observation):
         """convert observation"""
         return np.moveaxis(observation, 2, 0)
 
 
 class ScaledFloatFrame(gym.ObservationWrapper):
     """scales the pixels"""
-    def observation(self, obs):
+
+    @staticmethod
+    def observation(obs):
         return np.array(obs).astype(np.float32) / 255.0
 
 
 class BufferWrapper(gym.ObservationWrapper):
     """"Wrapper for image stacking"""
+
     def __init__(self, env, n_steps, dtype=np.float32):
         super(BufferWrapper, self).__init__(env)
         self.dtype = dtype

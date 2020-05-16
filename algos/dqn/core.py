@@ -2,11 +2,11 @@
 
 from typing import Tuple
 import numpy as np
-import gym
+
 import torch
 from torch import nn
 from torch.utils.data.dataset import IterableDataset
-
+import gym
 from algos.common.memory import ReplayBuffer, Experience
 
 

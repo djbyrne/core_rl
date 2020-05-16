@@ -24,6 +24,7 @@ class DuelingDQNLightning(DQNLightning):
         self.net = DuelingCNN(self.obs_shape, self.n_actions)
         self.target_net = DuelingCNN(self.obs_shape, self.n_actions)
 
+
 def main(hparams) -> None:
     """Main Run Method"""
     model = DQNLightning(hparams)
