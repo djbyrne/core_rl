@@ -59,6 +59,7 @@ class CNN(nn.Module):
         conv_out = self.conv(input_x).view(input_x.size()[0], -1)
         return self.head(conv_out)
 
+
 class MLP(nn.Module):
     """
     Simple MLP network
@@ -88,6 +89,7 @@ class MLP(nn.Module):
             output of network
         """
         return self.net(input_x.float())
+
 
 class DuelingMLP(nn.Module):
     """
