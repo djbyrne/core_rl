@@ -104,7 +104,7 @@ class ImageToPyTorch(gym.ObservationWrapper):
             low=0.0, high=1.0, shape=new_shape, dtype=np.float32)
 
     @staticmethod
-    def observation(self, observation):
+    def observation(observation):
         """convert observation"""
         return np.moveaxis(observation, 2, 0)
 
@@ -113,7 +113,7 @@ class ScaledFloatFrame(gym.ObservationWrapper):
     """scales the pixels"""
 
     @staticmethod
-    def observation(self, obs):
+    def observation(obs):
         return np.array(obs).astype(np.float32) / 255.0
 
 
