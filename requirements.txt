@@ -4,4 +4,4 @@ coverage>=5.1
 torch
 pytorch-lightning
 opencv-python
-gym
+gym[atari]
