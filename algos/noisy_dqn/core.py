@@ -18,11 +18,12 @@ class NoisyAgent(Agent):
     def get_action(self, net: nn.Module, device: str) -> int:
         """
         Using the given network, decide what action to carry out
-        using an epsilon-greedy policy
+        using a noisy network
+
         Args:
             net: DQN network
-            epsilon: value to determine likelihood of taking a random action
             device: current device
+
         Returns:
             action
         """
@@ -45,11 +46,13 @@ class NoisyAgent(Agent):
                   render: bool = False) -> Tuple[float, bool]:
         """
         Carries out a single interaction step between the agent and the environment
+
         Args:
             net: DQN network
             epsilon: value to determine likelihood of taking a random action
             device: current device
             render: flag denoting whether to display the step
+
         Returns:
             reward, done
         """
