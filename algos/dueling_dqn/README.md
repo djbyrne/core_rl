@@ -1,7 +1,8 @@
 # Dueling DQN
 
 The Q value that we are trying to approximate can be divided into two parts, the value state V(s) and the 'advantage'
-of actions in that state A(s, a). 
+of actions in that state A(s, a). Instead of having one full network estimate the entire Q value, Dueling DQN uses two
+estimator heads in order to seperate the estimation of the two parts.
 
 The value is the same as in value iteration. It is the discounted expected reward achieved from state s. Think of the
 value as the 'base reward' from being in state s.
@@ -21,6 +22,17 @@ by subtracting the mean advantage from the Q value. This essentially pulls the m
 ````text
 Q(s, a) = V(s) + A(s, a) - 1/N * sum_k(A(s, k)
 ````
+
+### Benefits
+
+- Ability to efficiently learn the state value function. In the dueling network, every Q update also updates the Value
+streeam, where as in DQN only the value of the chosen action is updated. This provides a better approximation of the 
+values
+- The differences between total Q values for a given state are quite small in relation to the magnitude of Q. The 
+difference in the Q values between the best action and the second best action can be very small, while the average 
+state value can be much larger. The differences in scale can introduce noise, which may lead to the greedy policy
+switching the priority of these actions. The seperate estimators for state value and advantage makes the Dueling 
+DQN robust to this type of scenario
 
 In order to update the basic DQN to a Dueling DQN we need to do the following
 
@@ -65,7 +77,9 @@ In order to update the basic DQN to a Dueling DQN we need to do the following
 
 The results below a noticeable improvement from the original DQN network. 
 
-#### Pong - Dueling DQN
+### Pong
+
+#### Dueling DQN
 
 Similar to the results of the DQN baseline, the agent has a period where the number of steps per episodes increase as 
 it begins to 

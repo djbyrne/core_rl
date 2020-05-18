@@ -11,6 +11,7 @@ import numpy as np
 import pytorch_lightning as pl
 
 from algos.dueling_dqn.model import DuelingDQNLightning
+from algos.noisy_dqn.model import NoisyDQNLightning
 
 
 def main(hparams) -> None:
@@ -20,10 +21,13 @@ def main(hparams) -> None:
     np.random.seed(hparams.seed)
     random.seed(hparams.seed)
 
-    if hparams.algo is 'double_dqn':
+    # TODO: this is shit, fix soon
+    if hparams.algo == 'double_dqn':
         model = DoubleDQNLightning(hparams)
-    elif hparams.algo is 'dueling_dqn':
+    elif hparams.algo == 'dueling_dqn':
         model = DuelingDQNLightning(hparams)
+    elif hparams.algo == 'noisy_dqn':
+        model = NoisyDQNLightning(hparams)
     else:
         model = DQNLightning(hparams)
 
@@ -31,7 +35,8 @@ def main(hparams) -> None:
         gpus=hparams.gpus,
         distributed_backend=hparams.backend,
         max_steps=hparams.max_steps,
-        val_check_interval=1000
+        max_epochs=hparams.max_steps,       # Set this as the same as max steps to ensure that it doesn't stop early
+        val_check_interval=1000             # This just needs 'some' value, does not effect training right now
     )
 
     trainer.fit(model)
