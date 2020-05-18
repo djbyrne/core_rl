@@ -1,10 +1,16 @@
 # Double DQN
 
 The original DQN tends to overestimate Q values during the Bellman update, leading to instability and is harmful to
-training. 
+training. This is due to the max operation in the Bellman equation. 
+
+We are constantly taking the max of our agents estimates 
+during our update. This may seem reasonable, if we could trust these estimates. However during the early stages of 
+training, the estimates for these values will be off center and can lead to instability in training until
+our estimates become more reliable
 
 The Double DQN fixes this overestimation by choosing actions for the next state using the main trained network
-but uses the values of these actions from the more stable target network.
+but uses the values of these actions from the more stable target network. So we are still going to take the greedy
+action, but the value will be less "optimisitc" because it is chosen by the target network.
 
 ## DQN expected return
 

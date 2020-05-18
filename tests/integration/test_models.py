@@ -5,6 +5,7 @@ import pytorch_lightning as pl
 from algos.double_dqn.model import DoubleDQNLightning
 from algos.dqn.model import DQNLightning
 from algos.dueling_dqn.model import DuelingDQNLightning
+from algos.noisy_dqn.model import NoisyDQNLightning
 
 
 class TestModels(TestCase):
@@ -42,6 +43,13 @@ class TestModels(TestCase):
     def test_dueling_dqn(self):
         """Smoke test that the Dueling DQN model runs"""
         model = DuelingDQNLightning(self.hparams)
+        result = self.trainer.fit(model)
+
+        self.assertEqual(result, 1)
+
+    def test_noisy_dqn(self):
+        """Smoke test that the Noisy DQN model runs"""
+        model = NoisyDQNLightning(self.hparams)
         result = self.trainer.fit(model)
 
         self.assertEqual(result, 1)
