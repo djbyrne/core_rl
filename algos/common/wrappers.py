@@ -76,7 +76,7 @@ class ProcessFrame84(gym.ObservationWrapper):
 
     @staticmethod
     def process(frame):
-        """image preprocessing"""
+        """image preprocessing, formats to 84x84"""
         if frame.size == 210 * 160 * 3:
             img = np.reshape(frame, [210, 160, 3]).astype(
                 np.float32)
@@ -140,6 +140,25 @@ class BufferWrapper(gym.ObservationWrapper):
         self.buffer[:-1] = self.buffer[1:]
         self.buffer[-1] = observation
         return self.buffer
+
+class DataAugmentation(gym.ObservationWrapper):
+    """
+    Carries out basic data augmentation on the env observations
+
+    - ToTensor
+    - GrayScale
+    - RandomCrop
+    """
+
+    def __init__(self, env=None):
+        super().__init__(env)
+        self.observation_space = gym.spaces.Box(low=0, high=255, shape=(84, 84, 1), dtype=np.uint8)
+
+    def observation(self, obs):
+        """preprocess the obs"""
+        return ProcessFrame84.process(obs)
+
+
 
 
 def make_env(env_name):
