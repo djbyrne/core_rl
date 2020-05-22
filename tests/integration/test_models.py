@@ -6,6 +6,8 @@ from algos.double_dqn.model import DoubleDQNLightning
 from algos.dqn.model import DQNLightning
 from algos.dueling_dqn.model import DuelingDQNLightning
 from algos.noisy_dqn.model import NoisyDQNLightning
+from algos.per_dqn.model import PERDQNLightning
+
 
 
 class TestModels(TestCase):
@@ -50,6 +52,13 @@ class TestModels(TestCase):
     def test_noisy_dqn(self):
         """Smoke test that the Noisy DQN model runs"""
         model = NoisyDQNLightning(self.hparams)
+        result = self.trainer.fit(model)
+
+        self.assertEqual(result, 1)
+
+    def test_per_dqn(self):
+        """Smoke test that the PER DQN model runs"""
+        model = PERDQNLightning(self.hparams)
         result = self.trainer.fit(model)
 
         self.assertEqual(result, 1)
