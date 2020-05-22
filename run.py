@@ -11,6 +11,8 @@ import numpy as np
 import pytorch_lightning as pl
 
 from algos.dueling_dqn.model import DuelingDQNLightning
+from algos.noisy_dqn.model import NoisyDQNLightning
+from algos.per_dqn.model import PERDQNLightning
 
 
 def main(hparams) -> None:
@@ -24,6 +26,10 @@ def main(hparams) -> None:
         model = DoubleDQNLightning(hparams)
     elif hparams.algo is 'dueling_dqn':
         model = DuelingDQNLightning(hparams)
+    elif hparams.algo == 'noisy_dqn':
+        model = NoisyDQNLightning(hparams)
+    elif hparams.algo == 'per_dqn':
+        model = PERDQNLightning(hparams)
     else:
         model = DQNLightning(hparams)
 

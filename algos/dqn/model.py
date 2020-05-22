@@ -162,7 +162,7 @@ class DQNLightning(pl.LightningModule):
         optimizer = optim.Adam(self.net.parameters(), lr=self.hparams.lr)
         return [optimizer]
 
-    def __dataloader(self) -> DataLoader:
+    def _dataloader(self) -> DataLoader:
         """Initialize the Replay Buffer dataset used for retrieving experiences"""
         dataset = RLDataset(self.buffer, self.hparams.episode_length)
         dataloader = DataLoader(dataset=dataset,
@@ -172,7 +172,7 @@ class DQNLightning(pl.LightningModule):
 
     def train_dataloader(self) -> DataLoader:
         """Get train loader"""
-        return self.__dataloader()
+        return self._dataloader()
 
     def get_device(self, batch) -> str:
         """Retrieve device currently being used by minibatch"""
