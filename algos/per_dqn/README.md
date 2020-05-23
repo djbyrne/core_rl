@@ -2,7 +2,8 @@
 
 The standard DQN uses a buffer to break up the correlation between experiences and uniform random samples for each 
 batch. Instead of just randomly sampling from the buffer prioritized experience replay (PER) prioritizes these samples
-based on training loss.
+based on training loss. This concept was introduced in the paper 
+[Prioritized Experience Replay](https://arxiv.org/abs/1511.05952)
 
 Essentially we want to train more on the samples that suprise the agent.
 
@@ -31,8 +32,11 @@ chances to improve upon it.
 ### PER Memory Buffer
 
 First step is to replace the standard experience replay buffer with the prioritized experience replay buffer. This
-is pretty large (100+ lines) so I wont go through it here. The buffer can be found in algos/common/memory.py . This
-implementation is a naive version using a List buffer. A better method would be to use a Tree structure. 
+is pretty large (100+ lines) so I wont go through it here. There are two buffers implemented. The first is a naive
+list based buffer found in memory.PERBuffer and the second is more efficient buffer using a Sum Tree datastructure. 
+
+The list based version is simpler, but has a sample complexity of O(N). The Sum Tree in comparison has a complexity
+of O(1) for sampling and O(logN) for updating priorities.
 
 ### Update loss function
 

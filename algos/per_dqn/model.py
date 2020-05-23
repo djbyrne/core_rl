@@ -10,12 +10,13 @@ After ~1500 steps, you will see the total_reward hitting the max score of 200. O
 see the metrics:
 tensorboard --logdir default
 """
+import argparse
 from collections import OrderedDict
 from typing import Tuple, List
 import torch
 from torch.utils.data import DataLoader
 
-from algos.common.memory import PERBuffer
+from algos.common.memory import PERBuffer, SumTreeBuffer
 from algos.dqn.core import Agent
 from algos.dqn.model import DQNLightning
 from algos.per_dqn.core import PrioRLDataset
@@ -26,7 +27,11 @@ class PERDQNLightning(DQNLightning):
 
     def __init__(self, hparams):
         super().__init__(hparams)
+
+
         self.buffer = PERBuffer(self.hparams.replay_size)
+        # self.buffer = SumTreeBuffer(self.hparams.replay_size)
+
         self.agent = Agent(self.env, self.buffer)
         self.populate(self.hparams.warm_start_steps)
 
@@ -44,6 +49,8 @@ class PERDQNLightning(DQNLightning):
         """
         samples, indices, weights = batch
 
+        indices = indices.cpu().numpy()
+
         device = self.get_device(samples)
         epsilon = max(self.hparams.eps_end, self.hparams.eps_start -
                       (self.global_step + 1) / self.hparams.eps_last_frame)
@@ -58,6 +65,7 @@ class PERDQNLightning(DQNLightning):
 
         # update priorities in buffer
         self.buffer.update_priorities(indices, batch_weights)
+        self.buffer.update_beta(self.global_step)
 
         if self.trainer.use_dp or self.trainer.use_ddp2:
             loss = loss.unsqueeze(0)
@@ -97,7 +105,7 @@ class PERDQNLightning(DQNLightning):
         Returns:
             loss
         """
-        states, actions, rewards, dones, next_states = batch  # batch of experiences, batch_size = 16
+        states, actions, rewards, dones, next_states = batch
 
         batch_weights = torch.tensor(batch_weights)
 
@@ -108,7 +116,7 @@ class PERDQNLightning(DQNLightning):
             next_state_values[dones] = 0.0
             next_state_values = next_state_values.detach()
 
-        expected_state_action_values = next_state_values * self.hparams.gamma + rewards
+            expected_state_action_values = next_state_values * self.hparams.gamma + rewards
 
         # explicit MSE loss
         loss = (state_action_values - expected_state_action_values) ** 2
