@@ -121,7 +121,10 @@ class PERBuffer:
 
         # choise sample of indices based on the priority prob distribution
         indices = np.random.choice(len(self.buffer), batch_size, p=probs)
-        samples = [self.buffer[idx] for idx in indices]
+        # samples = [self.buffer[idx] for idx in indices]
+        states, actions, rewards, dones, next_states = zip(*[self.buffer[idx] for idx in indices])
+
+        samples = (np.array(states), np.array(actions), np.array(rewards, dtype=np.float32), np.array(dones, dtype=np.bool), np.array(next_states))
         total = len(self.buffer)
 
         # weight of each sample datum to compensate for the bias added in with prioritising samples
@@ -254,7 +257,8 @@ class SumTreeBuffer:  # stored as ( s, a, r, s_ ) in SumTree
             s = random.uniform(a, b)
             (idx, p, data) = self.tree.get(s)
             priorities.append(p)
-            batch.append(data)
+            sample = (np.array(data.state), np.array(data.action), np.array(data.reward, dtype=np.float32), np.array(data.done, dtype=np.bool), np.array(data.new_state))
+            batch.append(sample)
             idxs.append(idx)
 
         sampling_probabilities = priorities / self.tree.total()

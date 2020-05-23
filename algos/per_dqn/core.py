@@ -21,9 +21,14 @@ class PrioRLDataset(IterableDataset):
     def __iter__(self) -> Tuple:
         samples, indices, weights = self.buffer.sample(self.sample_size)
 
-        for idx, sample in enumerate(samples):
-            batch = (sample.state, sample.action, sample.reward, sample.done, sample.new_state)
-            yield batch, indices[idx], weights[idx]
+        # for idx, sample in enumerate(samples):
+        #     yield sample, indices[idx], weights[idx]
+
+        states, actions, rewards, dones, new_states = samples
+        for idx, _ in enumerate(dones):
+            yield (states[idx], actions[idx], rewards[idx], dones[idx], new_states[idx]), indices[idx], weights[idx]
+
+
 
     def __getitem__(self, item):
         """Not used"""
