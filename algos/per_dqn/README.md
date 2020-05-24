@@ -9,7 +9,7 @@ Essentially we want to train more on the samples that suprise the agent.
 
 The priority of each sample is defined below where 
 
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;P(i) = \frac{P^\alpha_i}{\sum_kP_k^\alpha}" />
+<img src="https://latex.codecogs.com/svg.latex?\Large&space; P(i) = \frac{P^\alpha_i}{\sum_kP_k^\alpha}" />
 
 where pi is the priority of the ith sample in the buffer and
 𝛼 is the number that shows how much emphasis we give to the priority. If 𝛼 = 0 , our
@@ -19,7 +19,7 @@ more stress on samples with higher priority
 Its important that new samples are set to the highest priority so that they are sampled soon. This however introduces
 bias to new samples in our dataset. In order to compensate for this bias, the value of the weight is defined as
 
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;w_i = (N . P(i))^{-\beta}" />
+<img src="https://latex.codecogs.com/svg.latex?\Large&space; w_i = (N . P(i))^{-\beta}"/>
 
 Wher beta is a hyper parameter between 0-1. When beta is 1 the bias is fully compensated. However authors noted that 
 in practice it is better to start beta with a small value near 0 and slowly increase it to 1.
@@ -59,31 +59,27 @@ for each datum, with the addition of a small epsilon value.
 
 ## Results
 
-The results below improved stability and faster performance growth. 
+The results below show improved stability and faster performance growth.
 
 ### Pong
 
 #### PER DQN
  
-This seems to have improved the DQN the least. By the 500k mark it looks like the agent has achieved a pretty good
-policy, but its a slower progression and a bit more noisy. 
+Similar to the other improvements, we see that PER improves the stability of the agents training and shows to converged
+on an optimal policy faster.
  
-![Noisy DQN Results](../../docs/images/pong_per_dqn_baseline_results.png)
+![Noisy DQN Results](../../docs/images/pong_per_dqn_baseline_v1_results.png)
 
 #### DQN vs PER DQN 
 
-In comparison to the base DQN, the PER DQN shows comparable performance. Infact the final averaged reward is 20 on 
-the PER DQN and 21 on the DQN. Also, the loss of the PER DQN looks a little more volatile than the base DQN. One point
-of interest is that the the episode steps peak and lower much faster than the base DQN, implying that the PER DQN agent
-starts to beat the heuristic pong AI sooner than DQN. 
+In comparison to the base DQN, the PER DQN does show improved stability and performance. As expected, the loss 
+of the PER DQN is siginificantly lower. This is the main objective of PER by focusing on experiences with high loss.
 
-There are a few reasons why PER DQN may not be showing better improvements:
-
-- PER introduces two new hyper parameters, so some tuning may need to be done for these.
-- The implementation of the PER buffer is very simplistic and should be improved.
+It is important to note that loss is not the only metric we should be looking at. Although the agent may have very 
+low loss during training, it may still perform poorly due to lack of exploration. 
 
 
-![Noisy DQN Comparison](../../docs/images/pong_per_dqn_dqn_comparison.png)
+![Noisy DQN Comparison](../../docs/images/pong_per_dqn_baseline_v1_results_comp.png)
 
  - Orange: DQN
 

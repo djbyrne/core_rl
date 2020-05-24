@@ -10,13 +10,13 @@ After ~1500 steps, you will see the total_reward hitting the max score of 200. O
 see the metrics:
 tensorboard --logdir default
 """
-import argparse
+
 from collections import OrderedDict
 from typing import Tuple, List
 import torch
 from torch.utils.data import DataLoader
 
-from algos.common.memory import PERBuffer, SumTreeBuffer
+from algos.common.memory import PERBuffer
 from algos.dqn.core import Agent
 from algos.dqn.model import DQNLightning
 from algos.per_dqn.core import PrioRLDataset
@@ -28,9 +28,7 @@ class PERDQNLightning(DQNLightning):
     def __init__(self, hparams):
         super().__init__(hparams)
 
-
         self.buffer = PERBuffer(self.hparams.replay_size)
-        # self.buffer = SumTreeBuffer(self.hparams.replay_size)
 
         self.agent = Agent(self.env, self.buffer)
         self.populate(self.hparams.warm_start_steps)
@@ -65,7 +63,7 @@ class PERDQNLightning(DQNLightning):
 
         # update priorities in buffer
         self.buffer.update_priorities(indices, batch_weights)
-        self.buffer.update_beta(self.global_step)
+        # self.buffer.update_beta(self.global_step)
 
         if self.trainer.use_dp or self.trainer.use_ddp2:
             loss = loss.unsqueeze(0)
@@ -116,28 +114,9 @@ class PERDQNLightning(DQNLightning):
             next_s_vals = self.target_net(next_states).max(1)[0]
             next_s_vals[dones] = 0.0
             exp_sa_vals = next_s_vals.detach() * self.hparams.gamma + rewards
-        l = (state_action_vals - exp_sa_vals) ** 2
-        losses_v = batch_weights * l
-        return losses_v.mean(), \
-               (losses_v + 1e-5).data.cpu().numpy()
-
-        # state_action_values = self.net(states).gather(1, actions.unsqueeze(-1)).squeeze(-1)
-        #
-        # with torch.no_grad():
-        #     next_state_values = self.target_net(next_states).max(1)[0]
-        #     next_state_values[dones] = 0.0
-        #     next_state_values = next_state_values.detach()
-        #
-        #     expected_state_action_values = next_state_values * self.hparams.gamma + rewards
-        #
-        # # explicit MSE loss
-        # loss = (state_action_values - expected_state_action_values) ** 2
-        #
-        # # weighted MSE loss
-        # weighted_loss = batch_weights * loss
-        #
-        # # return the weighted_loss for the batch and the updated weighted loss for each datum in the batch
-        # return weighted_loss.mean(), (weighted_loss + 1e-5).data.cpu().numpy()
+        loss = (state_action_vals - exp_sa_vals) ** 2
+        losses_v = batch_weights * loss
+        return losses_v.mean(), (losses_v + 1e-5).data.cpu().numpy()
 
     def _dataloader(self) -> DataLoader:
         """Initialize the Replay Buffer dataset used for retrieving experiences"""
