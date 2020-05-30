@@ -15,10 +15,10 @@ from algos.common.networks import DuelingCNN
 from algos.dqn.model import DQNLightning
 
 
-class DuelingDQNLightning(DQNLightning):
-    """ Dueling DQN Model """
+class NStepDQNLightning(DQNLightning):
+    """ NStep DQN Model """
 
     def build_networks(self) -> None:
-        """Initializes the Dueling DQN train and target networks"""
+        """Initializes the NStep DQN train and target networks"""
         self.net = DuelingCNN(self.obs_shape, self.n_actions)
         self.target_net = DuelingCNN(self.obs_shape, self.n_actions)
