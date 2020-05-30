@@ -14,7 +14,6 @@ import argparse
 
 from algos.common import wrappers
 from algos.common.memory import MultiStepBuffer
-from algos.common.networks import DuelingCNN
 from algos.dqn.core import Agent
 from algos.dqn.model import DQNLightning
 

@@ -47,40 +47,83 @@ good results across the board.
 
 #### Multi Step Buffer
 
-`````python
+The only thing we need to change for the N Step DQN is the buffer. We need a multi step 
+buffer that combines n-steps into a single experience. This requires the following
 
-    #  add this to the dqn network
-    conv_out_size = self._get_conv_out(input_shape)
+##### N Step Buffer:
 
-    # advantage head
-    self.fc_adv = nn.Sequential(
-        nn.Linear(conv_out_size, 256),
-        nn.ReLU(),
-        nn.Linear(256, n_actions)
-    )
+Unlike the standard buffer, we need to use 2 buffers. One to store the n step roll outs
+and another to hold the accumulated multi step experience. 
 
-    # value head
-    self.fc_val = nn.Sequential(
-        nn.Linear(conv_out_size, 256),
-        nn.ReLU(),
-        nn.Linear(256, 1)
-    )
-``````
+##### Append:
+The append function needs to be changed. If the n_step_buffer is not full, i.e we dont have
+enough experiences to make a multi step experience, then we just append our current experience
+to the n_step_buffer.
 
-### Update Forward 
+If the n_step_buffer has enough experiences, then we can take the last n steps and form an 
+accumulate multi step experience to be added to the buffer.
+
+The multi step experience will look like the following:
+
+- State = the state at the start of the n_step buffer
+- Action = the action at the start of the n_step_buffer
+- Reward = is the accumulated discounted reward over the last n steps
+- Next State = the next state at the end of the n_step_buffer
+- Done = the done flag at the end of the n_step_buffer
+
 ````python
-    
-    def forward(self, x):
-        adv, val = self.adv_val(x)
 
-        # return the full Q value which is value + adv while we pull the mean to 0
-        return val + (adv - adv.mean(dim=1, keepdim=True))
+    def append(self, experience) -> None:
+        """
+        add an experience to the buffer by collecting n steps of experiences
+        Args:
+            experience: tuple (state, action, reward, done, next_state)
+        """
+        self.n_step_buffer.append(experience)
 
-    def adv_val(self, x):
-        fx = x.float() / 256 # normalize
-        conv_out = self.conv(fx).view(fx.size()[0], -1) 
-        return self.fc_adv(conv_out), self.fc_val(conv_out)
+        if len(self.n_step_buffer) >= self.n_step:
+            reward, next_state, done = self.get_transition_info()
+            first_experience = self.n_step_buffer[0]
+            multi_step_experience = Experience(first_experience.state,
+                                               first_experience.action,
+                                               reward,
+                                               done,
+                                               next_state)
+
+            self.buffer.append(multi_step_experience)
+
+    def get_transition_info(self, gamma=0.9) -> Tuple[np.float, np.array, np.int]:
+        """
+        get the accumulated transition info for the n_step_buffer
+        Args:
+            gamma: discount factor
+
+        Returns:
+            multi step reward, final observation and done
+        """
+        last_experience = self.n_step_buffer[-1]
+        final_state = last_experience.new_state
+        done = last_experience.done
+        reward = last_experience.reward
+
+        # calculate reward
+        # in reverse order, go through all the experiences up till the first experience
+        for experience in reversed(list(self.n_step_buffer)[:-1]):
+            reward_t = experience.reward
+            new_state_t = experience.new_state
+            done_t = experience.done
+
+            reward = reward_t + gamma * reward * (1 - done_t)
+            final_state, done = (new_state_t, done_t) if done_t else (final_state, done)
+
+        return reward, final_state, done
 ````
+
+##### Sample
+
+The sample function will behave as normal
+
+A snippet of the code for the N Step Replay Buffer is shown below
 
 ## Results
 
@@ -88,32 +131,11 @@ The results below a noticeable improvement from the original DQN network.
 
 ### Pong
 
-#### Dueling DQN
+#### N Step DQN
 
-Similar to the results of the DQN baseline, the agent has a period where the number of steps per episodes increase as 
-it begins to 
-hold its own against the heuristic oppoent, but then the steps per episode quickly begins to drop as it gets better 
-and starts to 
-beat its opponent faster and faster. There is a noticable point at step ~250k where the agent goes from losing to
-winning.
+#### DQN vs N Step DQN 
 
-As you can see by the total rewards, the dueling network's training progression is very stable and continues to trend 
-upward until it finally plateus. 
-
-![Dueling DQN Results](../../docs/images/pong_dueling_dqn_results.png)
-
-#### DQN vs Dueling DQN 
-
-In comparison to the base DQN, we see that the Dueling network's training is much more stable and is able to reach a
-score in the high teens faster than the DQN agent. Even though the Dueling network is more stable and out performs DQN
-early in training, by the end of training the two networks end up at the same point.
-
-This could very well be due to the simplicity of the Pong environment. 
-
- - Orange: DQN
-
- - Red: Dueling DQN
-
-![Dueling DQN Results](../../docs/images/pong_dueling_dqn_comparison.png)
-
-https://arxiv.org/pdf/1901.07510.pdf
+## References
+ - [Learning to Predict by the Methods of Temporal Differences ](http://incompleteideas.net/papers/sutton-88-with-erratum.pdf)
+ - [Deep Reinforcement Learning Hands On: Second Edition - Chapter 08](https://github.com/PacktPublishing/Deep-Reinforcement-Learning-Hands-On-Second-
+ - [Rainbow Is All You Need](https://github.com/Curt-Park/rainbow-is-all-you-need/blob/master/07.n_step_learning.ipynb)
