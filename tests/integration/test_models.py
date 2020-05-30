@@ -19,14 +19,16 @@ class TestModels(TestCase):
         parser.add_argument("--algo", type=str, default="dqn", help="algorithm to use for training")
         args_list = [
             "--algo", "dqn",
-            "--warm_start_steps", "500"
+            "--warm_start_steps", "500",
+            "--episode_length", "100"
         ]
         self.hparams = parser.parse_args(args_list)
 
         self.trainer = pl.Trainer(
             gpus=0,
             max_steps=100,
-            val_check_interval=1000
+            max_epochs=100,  # Set this as the same as max steps to ensure that it doesn't stop early
+            val_check_interval=1000  # This just needs 'some' value, does not effect training right now
         )
 
     def test_dqn(self):

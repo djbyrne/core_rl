@@ -211,6 +211,8 @@ class DQNLightning(pl.LightningModule):
                                 help="max episode reward in the environment")
         arg_parser.add_argument("--max_steps", type=int, default=500000,
                                 help="max steps to train the agent")
+        arg_parser.add_argument("--n_steps", type=int, default=4,
+                                help="how many steps to unroll for each update")
         arg_parser.add_argument("--gpus", type=int, default=1,
                                 help="number of gpus to use for training")
         arg_parser.add_argument("--seed", type=int, default=123,

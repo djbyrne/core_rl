@@ -12,9 +12,11 @@ tensorboard --logdir default
 """
 import argparse
 
+from torch.utils.data import DataLoader
+
 from algos.common import wrappers
 from algos.common.memory import MultiStepBuffer
-from algos.dqn.core import Agent
+from algos.dqn.core import Agent, RLDataset
 from algos.dqn.model import DQNLightning
 
 
@@ -35,7 +37,7 @@ class NStepDQNLightning(DQNLightning):
         self.target_net = None
         self.build_networks()
 
-        self.buffer = MultiStepBuffer(self.hparams.replay_size, n_step=4)
+        self.buffer = MultiStepBuffer(self.hparams.replay_size, n_step=self.hparams.n_steps)
         self.agent = Agent(self.env, self.buffer)
 
         self.total_reward = 0
