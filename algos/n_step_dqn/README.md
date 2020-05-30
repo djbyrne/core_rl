@@ -127,15 +127,32 @@ A snippet of the code for the N Step Replay Buffer is shown below
 
 ## Results
 
-The results below a noticeable improvement from the original DQN network. 
+As excpected, the N-Step DQN converges much faster than the standard DQN, however it also adds more instability to the 
+loss of the agent. This can be seen in the following experiments. 
 
 ### Pong
 
-#### N Step DQN
+#### N-Step DQN
 
-#### DQN vs N Step DQN 
+The N-Step DQN shows the greates increase in performance with respect to the other DQN variations. After less than 150k steps the agent begins to
+consistently win games and achieves the top score after ~170K steps. This is reflected in the sharp peak of the 
+total episode steps and of course, the total episode rewards.
+ 
+![N-Step DQN Baseline Results](../../docs/images/pong_nstep_dqn_1.png)
+
+#### DQN vs N-Step DQN 
+
+This improvement is shown in stark contrast to the base DQN, which only begins to win games after 250k steps and 
+requires over twice as many steps (450k) as the N-Step agent to achieve the high score of 21. One important thing to 
+notice is the large increase in the loss of the N-Step agent. This is expected as the agent is building 
+its expected reward off approximations of the future states. The large the size of N, the greater the instability. 
+Previous literature, listed below, shows the best results for the Pong environment with an N step between 3-5. For these
+experiments I opted with an N step of 4.
+
+![N-Step DQN Baseline Results vs DQN Baseline Results](../../docs/images/pong_nstep_dqn_2.png)
+
 
 ## References
  - [Learning to Predict by the Methods of Temporal Differences ](http://incompleteideas.net/papers/sutton-88-with-erratum.pdf)
- - [Deep Reinforcement Learning Hands On: Second Edition - Chapter 08](https://github.com/PacktPublishing/Deep-Reinforcement-Learning-Hands-On-Second-
+ - [Deep Reinforcement Learning Hands On: Second Edition - Chapter 08 ](https://github.com/PacktPublishing/Deep-Reinforcement-Learning-Hands-On-Second-Edition)
  - [Rainbow Is All You Need](https://github.com/Curt-Park/rainbow-is-all-you-need/blob/master/07.n_step_learning.ipynb)

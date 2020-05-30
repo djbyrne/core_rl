@@ -17,6 +17,7 @@ Most of these algorithms were based off the implementations found in
 - [X] Dueling DQN
 - [X] Noisy DQN
 - [X] DQN with Prioritized Experience Replay
+- [X] N Step DQN
 - [ ] DDPG
 - [ ] TD3
 - [ ] SAC
