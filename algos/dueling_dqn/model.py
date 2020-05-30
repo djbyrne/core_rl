@@ -11,7 +11,6 @@ see the metrics:
 tensorboard --logdir default
 """
 
-import pytorch_lightning as pl
 from algos.common.networks import DuelingCNN
 from algos.dqn.model import DQNLightning
 
@@ -23,17 +22,3 @@ class DuelingDQNLightning(DQNLightning):
         """Initializes the Dueling DQN train and target networks"""
         self.net = DuelingCNN(self.obs_shape, self.n_actions)
         self.target_net = DuelingCNN(self.obs_shape, self.n_actions)
-
-
-def main(hparams) -> None:
-    """Main Run Method"""
-    model = DQNLightning(hparams)
-
-    trainer = pl.Trainer(
-        gpus=hparams.gpus,
-        distributed_backend='dp',
-        max_epochs=hparams.max_epochs,
-        val_check_interval=1000
-    )
-
-    trainer.fit(model)

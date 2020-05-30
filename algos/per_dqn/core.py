@@ -28,8 +28,6 @@ class PrioRLDataset(IterableDataset):
         for idx, _ in enumerate(dones):
             yield (states[idx], actions[idx], rewards[idx], dones[idx], new_states[idx]), indices[idx], weights[idx]
 
-
-
     def __getitem__(self, item):
         """Not used"""
         return None

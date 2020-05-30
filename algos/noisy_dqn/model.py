@@ -14,7 +14,6 @@ from collections import OrderedDict
 from typing import Tuple
 
 import torch
-import pytorch_lightning as pl
 
 from algos.common.networks import NoisyCNN
 from algos.dqn.model import DQNLightning
@@ -92,17 +91,3 @@ class NoisyDQNLightning(DQNLightning):
                   }
 
         return OrderedDict({'loss': loss, 'log': log, 'progress_bar': status})
-
-
-def main(hparams) -> None:
-    """Main Run Method"""
-    model = DQNLightning(hparams)
-
-    trainer = pl.Trainer(
-        gpus=hparams.gpus,
-        distributed_backend='dp',
-        max_epochs=hparams.max_epochs,
-        val_check_interval=1000
-    )
-
-    trainer.fit(model)

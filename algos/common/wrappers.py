@@ -141,6 +141,7 @@ class BufferWrapper(gym.ObservationWrapper):
         self.buffer[-1] = observation
         return self.buffer
 
+
 class DataAugmentation(gym.ObservationWrapper):
     """
     Carries out basic data augmentation on the env observations
@@ -157,8 +158,6 @@ class DataAugmentation(gym.ObservationWrapper):
     def observation(self, obs):
         """preprocess the obs"""
         return ProcessFrame84.process(obs)
-
-
 
 
 def make_env(env_name):

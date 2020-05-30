@@ -3,6 +3,7 @@
 # Named tuple for storing experience steps gathered in training
 from typing import Tuple, List
 from collections import deque, namedtuple
+
 import numpy as np
 
 Experience = namedtuple(
@@ -47,6 +48,83 @@ class ReplayBuffer:
 
         return (np.array(states), np.array(actions), np.array(rewards, dtype=np.float32),
                 np.array(dones, dtype=np.bool), np.array(next_states))
+
+
+class MultiStepBuffer:
+    """
+    N Step Replay Buffer
+    """
+    def __init__(self, buffer_size, n_step=2):
+        self.n_step = n_step
+        self.buffer = deque(maxlen=buffer_size)
+        self.n_step_buffer = deque(maxlen=n_step)
+
+    def __len__(self):
+        return len(self.buffer)
+
+    def get_transition_info(self, gamma=0.9) -> Tuple[np.float, np.array, np.int]:
+        """
+        get the accumulated transition info for the n_step_buffer
+        Args:
+            gamma: discount factor
+
+        Returns:
+            multi step reward, final observation and done
+        """
+        last_experience = self.n_step_buffer[-1]
+        final_state = last_experience.new_state
+        done = last_experience.done
+        reward = last_experience.reward
+
+        # calculate reward
+        # in reverse order, go through all the experiences up till the first experience
+        for experience in reversed(list(self.n_step_buffer)[:-1]):
+            reward_t = experience.reward
+            new_state_t = experience.new_state
+            done_t = experience.done
+
+            reward = reward_t + gamma * reward * (1 - done_t)
+            final_state, done = (new_state_t, done_t) if done_t else (final_state, done)
+
+        return reward, final_state, done
+
+    def append(self, experience) -> None:
+        """
+        add an experience to the buffer by collecting n steps of experiences
+        Args:
+            experience: tuple (state, action, reward, done, next_state)
+        """
+        self.n_step_buffer.append(experience)
+
+        if len(self.n_step_buffer) >= self.n_step:
+            reward, next_state, done = self.get_transition_info()
+            first_experience = self.n_step_buffer[0]
+            multi_step_experience = Experience(first_experience.state,
+                                               first_experience.action,
+                                               reward,
+                                               done,
+                                               next_state)
+
+            self.buffer.append(multi_step_experience)
+
+    def sample(self, batch_size: int) -> Tuple:
+        """
+        Takes a sample of the buffer
+        Args:
+            batch_size: current batch_size
+
+        Returns:
+            a batch of tuple np arrays of Experiences
+        """
+        # pylint: disable=no-else-return
+        if len(self.buffer) >= batch_size:
+            indices = np.random.choice(len(self.buffer), batch_size, replace=False)
+            states, actions, rewards, dones, next_states = zip(*[self.buffer[idx] for idx in indices])
+
+            return (np.array(states), np.array(actions), np.array(rewards, dtype=np.float32),
+                    np.array(dones, dtype=np.bool), np.array(next_states))
+        else:
+            raise Exception('Buffer length is less than the batch size')
 
 
 class PERBuffer:
