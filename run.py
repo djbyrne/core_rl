@@ -11,6 +11,7 @@ import numpy as np
 import pytorch_lightning as pl
 
 from algos.dueling_dqn.model import DuelingDQNLightning
+from algos.n_step_dqn.model import NStepDQNLightning
 from algos.noisy_dqn.model import NoisyDQNLightning
 from algos.per_dqn.model import PERDQNLightning
 
@@ -31,6 +32,8 @@ def main(hparams) -> None:
         model = NoisyDQNLightning(hparams)
     elif hparams.algo == 'per_dqn':
         model = PERDQNLightning(hparams)
+    elif hparams.algo == 'n_step_dqn':
+        model = NStepDQNLightning(hparams)
     else:
         model = DQNLightning(hparams)
 
