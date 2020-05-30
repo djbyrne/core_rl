@@ -12,8 +12,6 @@ tensorboard --logdir default
 """
 import argparse
 
-from torch.utils.data import DataLoader
-
 from algos.common import wrappers
 from algos.common.memory import MultiStepBuffer
 from algos.dqn.core import Agent, RLDataset
