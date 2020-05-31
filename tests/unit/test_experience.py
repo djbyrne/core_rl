@@ -16,7 +16,8 @@ class TestExperienceSteam(TestCase):
 
     def setUp(self) -> None:
         self.env = ToTensor(gym.make("CartPole-v0"))
-        self.agent = Agent()
+        self.net = Mock()
+        self.agent = Agent(self.net)
         self.xp_stream = ExperienceStream(self.env, self.agent)
         self.rl_dataloader = DataLoader(self.xp_stream)
 

@@ -19,7 +19,7 @@ class ToTensor(gym.Wrapper):
     def step(self, action):
         """Take 1 step and cast to tensor"""
         state, reward, done, info = self.env.step(action)
-        return torch.tensor(state), torch.tensor(reward), torch.tensor(done), info
+        return torch.tensor(state), torch.tensor(reward), done, info
 
     def reset(self):
         """reset the env and cast to tensor"""
@@ -184,4 +184,5 @@ def make_env(env_name):
     env = ProcessFrame84(env)
     env = ImageToPyTorch(env)
     env = BufferWrapper(env, 4)
+    env = ToTensor(env)
     return ScaledFloatFrame(env)
