@@ -23,6 +23,7 @@ class Agent:
         """
         return 0
 
+
 class PolicyAgent(Agent):
     """Policy based agent that returns an action based on the networks policy"""
 

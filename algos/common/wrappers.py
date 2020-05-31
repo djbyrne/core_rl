@@ -25,6 +25,7 @@ class ToTensor(gym.Wrapper):
         """reset the env and cast to tensor"""
         return torch.tensor(self.env.reset())
 
+
 class FireResetEnv(gym.Wrapper):
     """For environments where the user need to press FIRE for the game to start."""
 

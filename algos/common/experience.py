@@ -1,4 +1,4 @@
-import torch
+"""Experience sources to be used as datasets for Ligthning DataLoaders"""
 from gym import Env
 from torch.utils.data import IterableDataset
 
@@ -19,6 +19,9 @@ class ExperienceStream(IterableDataset):
         self.env = env
         self.agent = agent
         self.state = self.env.reset()
+
+    def __getitem__(self, item):
+        return item
 
     def __iter__(self):
         action = self.agent(self.state)
