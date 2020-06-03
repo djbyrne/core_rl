@@ -11,13 +11,13 @@ class Agent:
     def __init__(self, net: nn.Module):
         self.net = net
 
-    def __call__(self, state: torch.Tensor) -> int:
+    def __call__(self, state: torch.Tensor, device: str) -> int:
         """
         Using the given network, decide what action to carry
 
         Args:
             state: current state of the environment
-
+            device: device used for current batch
         Returns:
             action
         """
@@ -38,7 +38,6 @@ class PolicyAgent(Agent):
         Returns:
             action defined by policy
         """
-
         if device not in ['cpu']:
             state = state.cuda(device)
 

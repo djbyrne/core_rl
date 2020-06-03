@@ -44,7 +44,7 @@ class TestReinforce(TestCase):
         for i_batch, batch in enumerate(self.rl_dataloader):
             exp_batch = batch
 
-            batch_qvals, batch_states, batch_actions = self.model.process_batch(exp_batch)
+            batch_qvals, batch_states, batch_actions, _ = self.model.process_batch(exp_batch)
 
             loss = self.model.loss(batch_qvals, batch_states, batch_actions)
 
@@ -73,13 +73,15 @@ class TestReinforce(TestCase):
             for mini_batch in batch:
                 batch_len += len(mini_batch)
 
-            q_vals, states, actions = self.model.process_batch(batch)
+            q_vals, states, actions, rewards = self.model.process_batch(batch)
 
             self.assertEqual(len(q_vals), batch_len)
             self.assertEqual(len(states), batch_len)
             self.assertEqual(len(actions), batch_len)
+            self.assertEqual(len(rewards), batch_len)
 
             self.assertEqual(len(q_vals.shape), 1)
             self.assertEqual(len(states.shape), 2)
             self.assertEqual(len(actions.shape), 1)
+            self.assertEqual(len(rewards.shape), 1)
 
