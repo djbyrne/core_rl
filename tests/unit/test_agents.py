@@ -17,7 +17,7 @@ class TestAgents(TestCase):
 
     def test_base_agent(self):
         agent = Agent(self.net)
-        action = agent(self.state)
+        action = agent(self.state, 'cuda:0')
         self.assertIsInstance(action, int)
 
 
@@ -25,7 +25,7 @@ class TestPolicyAgent(TestCase):
 
     def setUp(self) -> None:
         self.env = gym.make("CartPole-v0")
-        self.net = Mock(return_value=torch.Tensor([0.0, 1.0]))
+        self.net = Mock(return_value=torch.Tensor([0.0, 100.0]))
         self.state = torch.tensor(self.env.reset())
         self.device = 'cpu'
 

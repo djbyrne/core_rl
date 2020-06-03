@@ -37,16 +37,3 @@ class TestExperienceSteam(TestCase):
             self.assertEqual(len(batch), 4)
             self.assertIsInstance(batch[0][0], Experience)
             self.assertEqual(batch[0][-1].done, True)
-
-
-    def test_experience_stream_DONE(self):
-        mock_env = Mock()
-        mock_env.step = Mock(return_value=(0, 0, True, 0))
-        mock_env.reset = Mock(reutrn_value=0)
-        self.xp_stream.env = mock_env
-
-        for i_batch, batch in enumerate(self.rl_dataloader):
-            self.assertIsInstance(batch[0][0], Experience)
-            self.assertEqual(batch[0][-1].done, True)
-            self.assertTrue(self.xp_stream.env.reset.call_count, self.xp_stream.episodes)
-            break
