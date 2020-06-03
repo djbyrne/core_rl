@@ -14,6 +14,7 @@ from algos.dueling_dqn.model import DuelingDQNLightning
 from algos.n_step_dqn.model import NStepDQNLightning
 from algos.noisy_dqn.model import NoisyDQNLightning
 from algos.per_dqn.model import PERDQNLightning
+from algos.reinforce.model import ReinforceLightning
 
 
 def main(hparams) -> None:
@@ -34,6 +35,8 @@ def main(hparams) -> None:
         model = PERDQNLightning(hparams)
     elif hparams.algo == 'n_step_dqn':
         model = NStepDQNLightning(hparams)
+    elif hparams.algo == 'reinforce':
+        model = ReinforceLightning(hparams)
     else:
         model = DQNLightning(hparams)
 
@@ -50,7 +53,7 @@ def main(hparams) -> None:
 
 if __name__ == '__main__':
     parent_parser = argparse.ArgumentParser(add_help=False)
-    parser = DQNLightning.add_model_specific_args(parent_parser)
+    parser = ReinforceLightning.add_model_specific_args(parent_parser)
     parser.add_argument("--algo", type=str, default="dqn", help="algorithm to use for training")
     args = parser.parse_args()
 

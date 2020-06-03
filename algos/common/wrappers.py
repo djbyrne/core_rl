@@ -7,6 +7,23 @@ import numpy as np
 import cv2
 import gym
 import gym.spaces
+import torch
+
+
+class ToTensor(gym.Wrapper):
+    """For environments where the user need to press FIRE for the game to start."""
+
+    def __init__(self, env=None):
+        super(ToTensor, self).__init__(env)
+
+    def step(self, action):
+        """Take 1 step and cast to tensor"""
+        state, reward, done, info = self.env.step(action)
+        return torch.tensor(state), torch.tensor(reward), done, info
+
+    def reset(self):
+        """reset the env and cast to tensor"""
+        return torch.tensor(self.env.reset())
 
 
 class FireResetEnv(gym.Wrapper):
@@ -168,4 +185,5 @@ def make_env(env_name):
     env = ProcessFrame84(env)
     env = ImageToPyTorch(env)
     env = BufferWrapper(env, 4)
+    env = ToTensor(env)
     return ScaledFloatFrame(env)
