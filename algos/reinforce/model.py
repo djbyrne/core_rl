@@ -25,7 +25,7 @@ import pytorch_lightning as pl
 import gym
 
 from algos.common.agents import PolicyAgent
-from algos.common.experience import OnPolicyExperienceStream
+from algos.common.experience import EpisodicExperienceStream
 from algos.common.memory import Experience
 from algos.common.networks import MLP
 from algos.common.wrappers import ToTensor
@@ -224,7 +224,7 @@ class ReinforceLightning(pl.LightningModule):
 
     def _dataloader(self) -> DataLoader:
         """Initialize the Replay Buffer dataset used for retrieving experiences"""
-        dataset = OnPolicyExperienceStream(self.env, self.agent, episodes=self.hparams.batch_episodes)
+        dataset = EpisodicExperienceStream(self.env, self.agent, episodes=self.hparams.batch_episodes)
         dataloader = DataLoader(dataset=dataset)
         return dataloader
 

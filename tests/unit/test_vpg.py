@@ -1,15 +1,14 @@
 import argparse
 from unittest import TestCase
-
+import numpy as np
 import gym
 import torch
 from torch.utils.data import DataLoader
 
 from algos.common.agents import Agent
-from algos.common.experience import OnPolicyExperienceStream
+from algos.common.experience import EpisodicExperienceStream
 from algos.common.networks import MLP
 from algos.common.wrappers import ToTensor
-from algos.dqn.model import DQNLightning
 from algos.vanilla_policy_gradient.model import VPGLightning
 
 
@@ -21,7 +20,7 @@ class TestVPG(TestCase):
         self.n_actions = self.env.action_space.n
         self.net = MLP(self.obs_shape, self.n_actions)
         self.agent = Agent(self.net)
-        self.xp_stream = OnPolicyExperienceStream(self.env, self.agent, episodes=4)
+        self.xp_stream = EpisodicExperienceStream(self.env, self.agent, episodes=4)
         self.rl_dataloader = DataLoader(self.xp_stream)
 
         parent_parser = argparse.ArgumentParser(add_help=False)
@@ -36,11 +35,12 @@ class TestVPG(TestCase):
 
     def test_calc_q_vals(self):
         rewards = [torch.tensor(1), torch.tensor(1), torch.tensor(1), torch.tensor(1)]
-        gt_qvals = [torch.tensor(1.4653), torch.tensor(0.4950), torch.tensor(-0.4851), torch.tensor(-1.4751)]
+        gt_qvals = np.array([ 1.4652743,   0.49497533, -0.4851246,  -1.4751246 ])
 
         qvals = self.model.calc_qvals(rewards)
+        qvals = torch.stack(qvals).numpy()
 
-        self.assertAlmostEqual(gt_qvals.all(), qvals.all())
+        self.assertEqual(gt_qvals.all(), qvals.all())
 
     def test_loss(self):
         """Test the vpg loss function"""

@@ -25,7 +25,7 @@ from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 import gym
 from algos.common.agents import PolicyAgent
-from algos.common.experience import OnPolicyExperienceStream
+from algos.common.experience import EpisodicExperienceStream
 from algos.common.memory import Experience
 from algos.common.networks import MLP
 from algos.common.wrappers import ToTensor
@@ -55,7 +55,11 @@ class VPGLightning(pl.LightningModule):
         self.episode_count = 0
         self.episode_steps = 0
         self.total_episode_steps = 0
-
+        self.bs_smoothed = None
+        self.entropy = None
+        self.l_entropy = None
+        self.l_policy = None
+        self.l_total = None
         self.entropy_beta = self.hparams.entropy_beta
 
     def build_networks(self) -> None:
@@ -270,7 +274,7 @@ class VPGLightning(pl.LightningModule):
 
     def _dataloader(self) -> DataLoader:
         """Initialize the Replay Buffer dataset used for retrieving experiences"""
-        dataset = OnPolicyExperienceStream(self.env, self.agent, episodes=self.hparams.batch_episodes)
+        dataset = EpisodicExperienceStream(self.env, self.agent, episodes=self.hparams.batch_episodes)
         dataloader = DataLoader(dataset=dataset)
         return dataloader
 

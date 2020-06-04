@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from algos.common.agents import Agent
-from algos.common.experience import OnPolicyExperienceStream
+from algos.common.experience import EpisodicExperienceStream
 from algos.common.networks import MLP
 from algos.common.wrappers import ToTensor
 from algos.dqn.model import DQNLightning
@@ -21,7 +21,7 @@ class TestReinforce(TestCase):
         self.n_actions = self.env.action_space.n
         self.net = MLP(self.obs_shape, self.n_actions)
         self.agent = Agent(self.net)
-        self.xp_stream = OnPolicyExperienceStream(self.env, self.agent, episodes=4)
+        self.xp_stream = EpisodicExperienceStream(self.env, self.agent, episodes=4)
         self.rl_dataloader = DataLoader(self.xp_stream)
 
         parent_parser = argparse.ArgumentParser(add_help=False)
