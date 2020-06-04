@@ -55,11 +55,6 @@ class VPGLightning(pl.LightningModule):
         self.episode_count = 0
         self.episode_steps = 0
         self.total_episode_steps = 0
-        self.bs_smoothed = None
-        self.entropy = None
-        self.l_entropy = None
-        self.l_policy = None
-        self.l_total = None
         self.entropy_beta = self.hparams.entropy_beta
 
     def build_networks(self) -> None:
