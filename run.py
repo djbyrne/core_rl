@@ -15,6 +15,7 @@ from algos.n_step_dqn.model import NStepDQNLightning
 from algos.noisy_dqn.model import NoisyDQNLightning
 from algos.per_dqn.model import PERDQNLightning
 from algos.reinforce.model import ReinforceLightning
+from algos.vanilla_policy_gradient.model import VPGLightning
 
 
 def main(hparams) -> None:
@@ -37,6 +38,8 @@ def main(hparams) -> None:
         model = NStepDQNLightning(hparams)
     elif hparams.algo == 'reinforce':
         model = ReinforceLightning(hparams)
+    elif hparams.algo == 'vpg':
+        model = VPGLightning(hparams)
     else:
         model = DQNLightning(hparams)
 
@@ -53,7 +56,7 @@ def main(hparams) -> None:
 
 if __name__ == '__main__':
     parent_parser = argparse.ArgumentParser(add_help=False)
-    parser = ReinforceLightning.add_model_specific_args(parent_parser)
+    parser = DQNLightning.add_model_specific_args(parent_parser)
     parser.add_argument("--algo", type=str, default="dqn", help="algorithm to use for training")
     args = parser.parse_args()
 

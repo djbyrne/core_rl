@@ -85,3 +85,11 @@ class TestReinforce(TestCase):
             self.assertEqual(len(actions.shape), 1)
             self.assertEqual(len(rewards.shape), 1)
 
+    def test_calc_q_vals(self):
+        rewards = [1, 1, 1, 1]
+        gt_qvals = [3.9403989999999998, 2.9701, 1.99, 1.0]
+
+        qvals = self.model.calc_qvals(rewards)
+
+        self.assertEqual(gt_qvals, qvals)
+

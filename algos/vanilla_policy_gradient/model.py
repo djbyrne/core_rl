@@ -10,20 +10,20 @@ After ~1500 steps, you will see the total_reward hitting the max score of 200. O
 see the metrics:
 tensorboard --logdir default
 """
-import argparse
-from collections import OrderedDict
 from copy import deepcopy
 from itertools import chain
 from typing import Tuple, List
+import argparse
+from collections import OrderedDict
+
 import torch
-import torch.optim as optim
 from torch import Tensor
-from torch.nn.functional import log_softmax
+import torch.optim as optim
+from torch.nn.functional import log_softmax, softmax
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 import gym
-
 from algos.common.agents import PolicyAgent
 from algos.common.experience import OnPolicyExperienceStream
 from algos.common.memory import Experience
@@ -31,8 +31,8 @@ from algos.common.networks import MLP
 from algos.common.wrappers import ToTensor
 
 
-class ReinforceLightning(pl.LightningModule):
-    """ Basic DQN Model """
+class VPGLightning(pl.LightningModule):
+    """ VPG Model """
 
     def __init__(self, hparams: argparse.Namespace) -> None:
         super().__init__()
@@ -56,6 +56,8 @@ class ReinforceLightning(pl.LightningModule):
         self.episode_steps = 0
         self.total_episode_steps = 0
 
+        self.entropy_beta = self.hparams.entropy_beta
+
     def build_networks(self) -> None:
         """Initializes the DQN train and target networks"""
         self.net = MLP(self.obs_shape, self.n_actions)
@@ -73,7 +75,7 @@ class ReinforceLightning(pl.LightningModule):
         output = self.net(x)
         return output
 
-    def calc_qvals(self, rewards: List[List]) -> List[List]:
+    def calc_qvals(self, rewards: List[Tensor]) -> List[Tensor]:
         """
         Takes in the rewards for each batched episode and returns list of qvals for each batched episode
 
@@ -89,7 +91,13 @@ class ReinforceLightning(pl.LightningModule):
             sum_r *= self.hparams.gamma
             sum_r += reward
             res.append(deepcopy(sum_r))
-        return list(reversed(res))
+        res = list(reversed(res))
+        # Subtract the mean (baseline) from the q_vals to reduce the high variance
+        sum_q = 0
+        for rew in res:
+            sum_q += rew
+        mean_q = sum_q / len(res)
+        return [q - mean_q for q in res]
 
     def process_batch(self, batch: List[List[Experience]]) -> Tuple[List[Tensor], List[Tensor], List[Tensor]]:
         """
@@ -173,10 +181,48 @@ class ReinforceLightning(pl.LightningModule):
             loss
         """
         logits = self.net(batch_states)
+
+        log_prob, policy_loss = self.calc_policy_loss(batch_actions, batch_qvals, batch_states, logits)
+
+        entropy_loss_v = self.calc_entropy_loss(log_prob, logits)
+
+        loss = policy_loss + entropy_loss_v
+
+        return loss
+
+    def calc_entropy_loss(self, log_prob: Tensor, logits: Tensor) -> Tensor:
+        """
+        Calculates the entropy to be added to the loss function
+        Args:
+            log_prob: log probabilities for each action
+            logits: the raw outputs of the network
+
+        Returns:
+            entropy penalty for each state
+        """
+        prob_v = softmax(logits, dim=1)
+        entropy_v = -(prob_v * log_prob).sum(dim=1).mean()
+        entropy_loss_v = -self.entropy_beta * entropy_v
+        return entropy_loss_v
+
+    @staticmethod
+    def calc_policy_loss(batch_actions: Tensor, batch_qvals: Tensor,
+                         batch_states: Tensor, logits: Tensor) -> Tuple[List, Tensor]:
+        """
+        Calculate the policy loss give the batch outputs and logits
+        Args:
+            batch_actions: actions from batched episodes
+            batch_qvals: Q values from batched episodes
+            batch_states: states from batched episodes
+            logits: raw output of the network given the batch_states
+
+        Returns:
+            policy loss
+        """
         log_prob = log_softmax(logits, dim=1)
         log_prob_actions = batch_qvals * log_prob[range(len(batch_states)), batch_actions]
-        loss = -log_prob_actions.mean()
-        return loss
+        policy_loss = -log_prob_actions.mean()
+        return log_prob, policy_loss
 
     def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor], _) -> OrderedDict:
         """
@@ -279,4 +325,6 @@ class ReinforceLightning(pl.LightningModule):
                                 help="seed for training run")
         arg_parser.add_argument("--backend", type=str, default="dp",
                                 help="distributed backend to be used by lightning")
+        arg_parser.add_argument("--entropy_beta", type=int, default=0.01,
+                                help="entropy beta")
         return arg_parser
