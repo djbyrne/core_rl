@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from algos.common.agents import Agent
-from algos.common.experience import OnPolicyExperienceStream
+from algos.common.experience import EpisodicExperienceStream
 from algos.common.networks import MLP
 from algos.common.wrappers import ToTensor
 from algos.dqn.model import DQNLightning
@@ -21,7 +21,7 @@ class TestReinforce(TestCase):
         self.n_actions = self.env.action_space.n
         self.net = MLP(self.obs_shape, self.n_actions)
         self.agent = Agent(self.net)
-        self.xp_stream = OnPolicyExperienceStream(self.env, self.agent, episodes=4)
+        self.xp_stream = EpisodicExperienceStream(self.env, self.agent, episodes=4)
         self.rl_dataloader = DataLoader(self.xp_stream)
 
         parent_parser = argparse.ArgumentParser(add_help=False)
@@ -84,4 +84,12 @@ class TestReinforce(TestCase):
             self.assertEqual(len(states.shape), 2)
             self.assertEqual(len(actions.shape), 1)
             self.assertEqual(len(rewards.shape), 1)
+
+    def test_calc_q_vals(self):
+        rewards = [1, 1, 1, 1]
+        gt_qvals = [3.9403989999999998, 2.9701, 1.99, 1.0]
+
+        qvals = self.model.calc_qvals(rewards)
+
+        self.assertEqual(gt_qvals, qvals)
 

@@ -5,7 +5,7 @@ import gym
 from torch.utils.data import DataLoader
 
 from algos.common.agents import Agent
-from algos.common.experience import OnPolicyExperienceStream
+from algos.common.experience import EpisodicExperienceStream
 from algos.common.memory import Experience
 from algos.common.wrappers import ToTensor
 
@@ -17,7 +17,7 @@ class TestExperienceSteam(TestCase):
         self.env = ToTensor(gym.make("CartPole-v0"))
         self.net = Mock()
         self.agent = Agent(self.net)
-        self.xp_stream = OnPolicyExperienceStream(self.env, self.agent, episodes=4)
+        self.xp_stream = EpisodicExperienceStream(self.env, self.agent, episodes=4)
         self.rl_dataloader = DataLoader(self.xp_stream)
 
     def test_experience_stream_SINGLE_EPISODE(self):

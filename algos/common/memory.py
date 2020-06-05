@@ -1,6 +1,7 @@
 """Series of memory buffers sued"""
 
 # Named tuple for storing experience steps gathered in training
+import collections
 from typing import Tuple, List
 from collections import deque, namedtuple
 
@@ -126,6 +127,28 @@ class MultiStepBuffer:
         else:
             raise Exception('Buffer length is less than the batch size')
 
+
+class MeanBuffer:
+    """
+    Stores a deque of items and calculates the mean
+    """
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.deque = collections.deque(maxlen=capacity)
+        self.sum = 0.0
+
+    def add(self, val: float) -> None:
+        """Add to the buffer"""
+        if len(self.deque) == self.capacity:
+            self.sum -= self.deque[0]
+        self.deque.append(val)
+        self.sum += val
+
+    def mean(self) -> float:
+        """Retrieve the mean"""
+        if not self.deque:
+            return 0.0
+        return self.sum / len(self.deque)
 
 class PERBuffer:
     """simple list based Prioritized Experience Replay Buffer"""
