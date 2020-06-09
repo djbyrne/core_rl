@@ -1,21 +1,79 @@
 from unittest import TestCase
+from unittest.mock import Mock
 
-import numpy
+import numpy as np
 import torch
+from torch.utils.data import DataLoader
 
-from algos.common.memory import ReplayBuffer, Experience, PERBuffer, MultiStepBuffer
+from algos.common.experience import RLDataset
+from algos.common.memory import ReplayBuffer, Experience, PERBuffer, MultiStepBuffer, Buffer
+
+
+class TestBuffer(TestCase):
+
+    def setUp(self) -> None:
+        mock_states = np.random.rand(4, 84, 84)
+        mock_action = np.random.rand(1)
+        mock_rewards = np.random.rand(1)
+        mock_dones = np.random.rand(1)
+        mock_next_states = np.random.rand(4, 84, 84)
+        self.sample = mock_states, mock_action, mock_rewards, mock_dones, mock_next_states
+        self.source = Mock()
+        self.source.step = Mock(return_value=self.sample)
+        self.batch_size = 32
+        self.buffer = Buffer(self.source)
+
+    def test_sample_single(self):
+        """check that a sinlge sample is returned"""
+        sample = self.buffer.sample(1)
+        self.assertEqual(len(sample), 5)
+        self.assertEqual(sample[0].shape, (1, 4, 84, 84))
+        self.assertEqual(sample[1].shape, (1, 1))
+        self.assertEqual(sample[2].shape, (1, 1))
+        self.assertEqual(sample[3].shape, (1, 1))
+        self.assertEqual(sample[4].shape, (1, 4, 84, 84))
+
+    def test_sample_batch(self):
+        """check that a sinlge sample is returned"""
+        sample = self.buffer.sample(self.batch_size)
+        self.assertEqual(len(sample), 5)
+        self.assertEqual(sample[0].shape, (self.batch_size, 4, 84, 84))
+        self.assertEqual(sample[1].shape, (self.batch_size, 1))
+        self.assertEqual(sample[2].shape, (self.batch_size, 1))
+        self.assertEqual(sample[3].shape, (self.batch_size, 1))
+        self.assertEqual(sample[4].shape, (self.batch_size, 4, 84, 84))
+
+    def test_dataloader(self):
+        """tests that the buffer works with dataloader"""
+        dataset = RLDataset(self.buffer, sample_size=self.batch_size)
+        dl = DataLoader(dataset, batch_size=self.batch_size)
+
+        for i_batch, sample_batched in enumerate(dl):
+            self.assertIsInstance(sample_batched, list)
+            self.assertEqual(sample_batched[0].shape, torch.Size([self.batch_size, 4, 84, 84]))
+            self.assertEqual(sample_batched[1].shape, torch.Size([self.batch_size, 1]))
+            self.assertEqual(sample_batched[2].shape, torch.Size([self.batch_size, 1]))
+            self.assertEqual(sample_batched[3].shape, torch.Size([self.batch_size, 1]))
+            self.assertEqual(sample_batched[4].shape, torch.Size([self.batch_size, 4, 84, 84]))
 
 
 class TestReplayBuffer(TestCase):
 
     def setUp(self) -> None:
-        self.buffer = ReplayBuffer(10)
-
-        self.state = numpy.random.rand(32, 32)
-        self.next_state = numpy.random.rand(32, 32)
-        self.action = numpy.ones([1])
-        self.reward = numpy.ones([1])
-        self.done = numpy.zeros([1])
+        mock_states = np.random.rand(4, 84, 84)
+        mock_action = np.random.rand(1)
+        mock_rewards = np.random.rand(1)
+        mock_dones = np.random.rand(1)
+        mock_next_states = np.random.rand(4, 84, 84)
+        self.sample = mock_states, mock_action, mock_rewards, mock_dones, mock_next_states
+        self.source = Mock()
+        self.source.step = Mock(return_value=self.sample)
+        self.buffer = ReplayBuffer(self.source, 10)
+        self.state = np.random.rand(32, 32)
+        self.next_state = np.random.rand(32, 32)
+        self.action = np.ones([1])
+        self.reward = np.ones([1])
+        self.done = np.zeros([1])
         self.experience = Experience(self.state, self.action, self.reward, self.done, self.next_state)
 
     def test_replay_buffer_APPEND(self):
@@ -26,6 +84,23 @@ class TestReplayBuffer(TestCase):
         self.buffer.append(self.experience)
 
         self.assertEqual(len(self.buffer), 1)
+
+    def test_replay_buffer_POPULATE(self):
+        """Tests that the buffer is populated correctly with warm_start"""
+        warm_start = 8
+        self.assertEqual(len(self.buffer.buffer), 0)
+        _ = self.buffer.populate(warm_start)
+        self.assertEqual(len(self.buffer.buffer), warm_start)
+
+    def test_replay_buffer_UPDATE(self):
+        """Tests that once a sample has been taken, a step in the experience source has also been taken"""
+        batch_size = 3
+        self.assertEqual(len(self.buffer.buffer), 0)
+        for i in range(3):
+            self.buffer.append(self.experience)
+        self.assertEqual(len(self.buffer.buffer), 3)
+        _ = self.buffer.sample(batch_size)
+        self.assertEqual(len(self.buffer.buffer), 4)
 
     def test_replay_buffer_SAMPLE(self):
         """Test that you can sample from the buffer and the outputs are the correct shape"""
@@ -60,11 +135,11 @@ class TestPrioReplayBuffer(TestCase):
     def setUp(self) -> None:
         self.buffer = PERBuffer(10)
 
-        self.state = numpy.random.rand(32, 32)
-        self.next_state = numpy.random.rand(32, 32)
-        self.action = numpy.ones([1])
-        self.reward = numpy.ones([1])
-        self.done = numpy.zeros([1])
+        self.state = np.random.rand(32, 32)
+        self.next_state = np.random.rand(32, 32)
+        self.action = np.ones([1])
+        self.reward = np.ones([1])
+        self.done = np.zeros([1])
         self.experience = Experience(self.state, self.action, self.reward, self.done, self.next_state)
 
     def test_replay_buffer_APPEND(self):
@@ -113,16 +188,16 @@ class TestMultiStepReplayBuffer(TestCase):
     def setUp(self) -> None:
         self.buffer = MultiStepBuffer(buffer_size=10, n_step=2)
 
-        self.state = numpy.zeros([32, 32])
-        self.state_02 = numpy.ones([32, 32])
-        self.next_state = numpy.zeros([32, 32])
-        self.next_state_02 = numpy.ones([32, 32])
-        self.action = numpy.zeros([1])
-        self.action_02 = numpy.ones([1])
-        self.reward = numpy.zeros([1])
-        self.reward_02 = numpy.ones([1])
-        self.done = numpy.zeros([1])
-        self.done_02 = numpy.zeros([1])
+        self.state = np.zeros([32, 32])
+        self.state_02 = np.ones([32, 32])
+        self.next_state = np.zeros([32, 32])
+        self.next_state_02 = np.ones([32, 32])
+        self.action = np.zeros([1])
+        self.action_02 = np.ones([1])
+        self.reward = np.zeros([1])
+        self.reward_02 = np.ones([1])
+        self.done = np.zeros([1])
+        self.done_02 = np.zeros([1])
 
         self.experience01 = Experience(self.state, self.action, self.reward, self.done, self.next_state)
         self.experience02 = Experience(self.state_02, self.action_02, self.reward_02, self.done_02, self.next_state_02)

@@ -2,7 +2,7 @@
 
 # Named tuple for storing experience steps gathered in training
 import collections
-from typing import Tuple, List
+from typing import Tuple, List, Union
 from collections import deque, namedtuple
 
 import numpy as np
@@ -12,7 +12,39 @@ Experience = namedtuple(
                                'done', 'new_state'])
 
 
-class ReplayBuffer:
+class Buffer:
+    """
+    Basic Buffer for storing a single experience at a time
+
+    Args:
+        capacity: size of the buffer
+    """
+    def __init__(self, source) -> None:
+        self.source = source
+
+    def __len__(self) -> None:
+        return 1
+
+    def sample(self, sample_size=1) -> Union[Tuple, List[Tuple]]:
+        """
+        Takes a sample of the buffer
+
+        Returns:
+            a batch of tuple np arrays of state, action, reward, done, next_state
+        """
+        states, actions, rewards, dones, next_states = [], [], [], [], []
+        for sample in range(sample_size):
+            state, action, reward, done, next_state = self.source.step()
+            states.append(state)
+            actions.append(action)
+            rewards.append(reward)
+            dones.append(done)
+            next_states.append(next_state)
+
+        return np.array(states), np.array(actions), np.array(rewards), np.array(dones), np.array(next_states)
+
+
+class ReplayBuffer(Buffer):
     """
     Replay Buffer for storing past experiences allowing the agent to learn from them
 
@@ -20,7 +52,8 @@ class ReplayBuffer:
         capacity: size of the buffer
     """
 
-    def __init__(self, capacity: int) -> None:
+    def __init__(self, source, capacity: int) -> None:
+        super().__init__(source)
         self.buffer = deque(maxlen=capacity)
 
     def __len__(self) -> None:
@@ -42,14 +75,27 @@ class ReplayBuffer:
             batch_size: current batch_size
 
         Returns:
-            a batch of tuple np arrays of Experiences
+            a batch of tuple np arrays of state, action, reward, done, next_state
         """
+
+        # update buffer with latest experience
+        self.update()
+
         indices = np.random.choice(len(self.buffer), batch_size, replace=False)
         states, actions, rewards, dones, next_states = zip(*[self.buffer[idx] for idx in indices])
 
         return (np.array(states), np.array(actions), np.array(rewards, dtype=np.float32),
                 np.array(dones, dtype=np.bool), np.array(next_states))
 
+    def update(self) -> None:
+        """Retrieves the next step from the experience source and appends to the buffer"""
+        exp = self.source.step()
+        self.append(exp)
+
+    def populate(self, warm_start: int) -> None:
+        for _ in range(warm_start):
+            exp = self.source.step()
+            self.append(exp)
 
 class MultiStepBuffer:
     """
@@ -149,6 +195,7 @@ class MeanBuffer:
         if not self.deque:
             return 0.0
         return self.sum / len(self.deque)
+
 
 class PERBuffer:
     """simple list based Prioritized Experience Replay Buffer"""
