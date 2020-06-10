@@ -24,7 +24,7 @@ class TestEpisodicExperience(TestCase):
         self.env = ToTensor(gym.make("CartPole-v0"))
         self.net = Mock()
         self.agent = Agent(self.net)
-        self.xp_stream = EpisodicExperienceStream(self.env, self.agent, episodes=4)
+        self.xp_stream = EpisodicExperienceStream(self.env, self.agent, device=Mock(), episodes=4)
         self.rl_dataloader = DataLoader(self.xp_stream)
 
     def test_experience_stream_SINGLE_EPISODE(self):
@@ -52,7 +52,7 @@ class TestExperienceSource(TestCase):
         self.net = Mock()
         self.agent = DummyAgent(net=self.net)
         self.env = gym.make("CartPole-v0")
-        self.source = ExperienceSource(self.env, self.agent)
+        self.source = ExperienceSource(self.env, self.agent, Mock())
 
     def test_step(self):
         exp = self.source.step()

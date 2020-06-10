@@ -12,7 +12,11 @@ tensorboard --logdir default
 """
 import argparse
 
+import torch
+
 from algos.common import wrappers
+from algos.common.agents import ValueAgent
+from algos.common.experience import ExperienceSource
 from algos.common.memory import MultiStepBuffer
 from algos.dqn.core import Agent
 from algos.dqn.model import DQNLightning
@@ -25,6 +29,8 @@ class NStepDQNLightning(DQNLightning):
         super().__init__(hparams)
         self.hparams = hparams
 
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
         self.env = wrappers.make_env(self.hparams.env)
         self.env.seed(123)
 
@@ -35,13 +41,17 @@ class NStepDQNLightning(DQNLightning):
         self.target_net = None
         self.build_networks()
 
-        self.buffer = MultiStepBuffer(self.hparams.replay_size, n_step=self.hparams.n_steps)
-        self.agent = Agent(self.env, self.buffer)
+        self.agent = ValueAgent(self.net, self.n_actions, eps_start=hparams.eps_start,
+                               eps_end=hparams.eps_end, eps_frames=hparams.eps_last_frame)
+        self.source = ExperienceSource(self.env, self.agent, device)
+        self.buffer = MultiStepBuffer(self.source, self.hparams.replay_size, self.hparams.warm_start_size)
 
         self.total_reward = 0
         self.episode_reward = 0
         self.episode_count = 0
         self.episode_steps = 0
         self.total_episode_steps = 0
-
-        self.populate(self.hparams.warm_start_steps)
+        self.reward_list = []
+        for _ in range(100):
+            self.reward_list.append(-21)
+        self.avg_reward = 0

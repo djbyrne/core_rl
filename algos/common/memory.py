@@ -103,18 +103,27 @@ class ReplayBuffer(Buffer):
                 self.append(exp)
 
 
-
-class MultiStepBuffer:
+class MultiStepBuffer(Buffer):
     """
     N Step Replay Buffer
     """
-    def __init__(self, buffer_size, n_step=2):
+    def __init__(self, source, capacity: int, warm_start: int, n_step=2):
+        super().__init__(source)
         self.n_step = n_step
-        self.buffer = deque(maxlen=buffer_size)
+        self.buffer = deque(maxlen=capacity)
         self.n_step_buffer = deque(maxlen=n_step)
+        self.populate(warm_start)
 
     def __len__(self):
         return len(self.buffer)
+
+    def populate(self, warm_start: int) -> None:
+        """Populates the buffer with initial experience"""
+        if warm_start > 0:
+            for _ in range(warm_start):
+                self.source.agent.epsilon = 1.0
+                exp = self.source.step()
+                self.append(exp)
 
     def get_transition_info(self, gamma=0.9) -> Tuple[np.float, np.array, np.int]:
         """
@@ -160,6 +169,12 @@ class MultiStepBuffer:
                                                next_state)
 
             self.buffer.append(multi_step_experience)
+
+    def update(self) -> Tuple:
+        """Retrieves the next step from the experience source and appends to the buffer"""
+        exp = self.source.step()
+        self.append(exp)
+        return exp.reward, exp.done
 
     def sample(self, batch_size: int) -> Tuple:
         """

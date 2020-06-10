@@ -69,8 +69,8 @@ class EpisodicExperienceStream(ExperienceSource):
         agent: Agent being used to make decisions
     """
 
-    def __init__(self, env: Env, agent: Agent, episodes: int = 1):
-        super().__init__(env, agent)
+    def __init__(self, env: Env, agent: Agent, device, episodes: int = 1):
+        super().__init__(env, agent, device)
         self.episodes = episodes
 
     def __getitem__(self, item):

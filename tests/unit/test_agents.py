@@ -34,7 +34,6 @@ class TestValueAgent(TestCase):
 
         action = self.value_agent(self.state, self.device)
         self.assertIsInstance(action, int)
-        self.assertEqual(action, 1)
 
     def test_value_agent_GET_ACTION(self):
         action = self.value_agent.get_action(self.state, self.device)

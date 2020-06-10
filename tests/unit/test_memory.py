@@ -60,15 +60,12 @@ class TestBuffer(TestCase):
 class TestReplayBuffer(TestCase):
 
     def setUp(self) -> None:
-        mock_states = np.random.rand(4, 84, 84)
-        mock_action = np.random.rand(1)
-        mock_rewards = np.random.rand(1)
-        mock_dones = np.random.rand(1)
-        mock_next_states = np.random.rand(4, 84, 84)
-        self.sample = mock_states, mock_action, mock_rewards, mock_dones, mock_next_states
-        self.source = Mock()
-        self.source.step = Mock(return_value=self.sample)
-        self.buffer = ReplayBuffer(self.source, 10)
+        # mock_states = np.random.rand(4, 84, 84)
+        # mock_action = np.random.rand(1)
+        # mock_rewards = np.random.rand(1)
+        # mock_dones = np.random.rand(1)
+        # mock_next_states = np.random.rand(4, 84, 84)
+        # self.sample = mock_states, mock_action, mock_rewards, mock_dones, mock_next_states
         self.state = np.random.rand(32, 32)
         self.next_state = np.random.rand(32, 32)
         self.action = np.ones([1])
@@ -76,31 +73,31 @@ class TestReplayBuffer(TestCase):
         self.done = np.zeros([1])
         self.experience = Experience(self.state, self.action, self.reward, self.done, self.next_state)
 
+        self.source = Mock()
+        self.source.step = Mock(return_value=self.experience)
+        self.warm_start = 10
+        self.buffer = ReplayBuffer(self.source, 20, warm_start=self.warm_start)
+
     def test_replay_buffer_APPEND(self):
         """Test that you can append to the replay buffer"""
 
-        self.assertEqual(len(self.buffer), 0)
+        self.assertEqual(len(self.buffer), self.warm_start)
 
         self.buffer.append(self.experience)
 
-        self.assertEqual(len(self.buffer), 1)
+        self.assertEqual(len(self.buffer), self.warm_start + 1)
 
     def test_replay_buffer_POPULATE(self):
         """Tests that the buffer is populated correctly with warm_start"""
-        warm_start = 8
-        self.assertEqual(len(self.buffer.buffer), 0)
-        _ = self.buffer.populate(warm_start)
-        self.assertEqual(len(self.buffer.buffer), warm_start)
+        self.assertEqual(len(self.buffer.buffer), self.warm_start)
 
     def test_replay_buffer_UPDATE(self):
-        """Tests that once a sample has been taken, a step in the experience source has also been taken"""
+        """Tests that buffer append works correctly"""
         batch_size = 3
-        self.assertEqual(len(self.buffer.buffer), 0)
-        for i in range(3):
+        self.assertEqual(len(self.buffer.buffer), self.warm_start)
+        for i in range(batch_size):
             self.buffer.append(self.experience)
-        self.assertEqual(len(self.buffer.buffer), 3)
-        _ = self.buffer.sample(batch_size)
-        self.assertEqual(len(self.buffer.buffer), 4)
+        self.assertEqual(len(self.buffer.buffer), self.warm_start + batch_size)
 
     def test_replay_buffer_SAMPLE(self):
         """Test that you can sample from the buffer and the outputs are the correct shape"""
