@@ -52,9 +52,10 @@ class ReplayBuffer(Buffer):
         capacity: size of the buffer
     """
 
-    def __init__(self, source, capacity: int) -> None:
+    def __init__(self, source, capacity: int, warm_start: int) -> None:
         super().__init__(source)
         self.buffer = deque(maxlen=capacity)
+        self.populate(warm_start)
 
     def __len__(self) -> None:
         return len(self.buffer)
@@ -79,7 +80,7 @@ class ReplayBuffer(Buffer):
         """
 
         # update buffer with latest experience
-        self.update()
+        # self.update()
 
         indices = np.random.choice(len(self.buffer), batch_size, replace=False)
         states, actions, rewards, dones, next_states = zip(*[self.buffer[idx] for idx in indices])
@@ -87,15 +88,21 @@ class ReplayBuffer(Buffer):
         return (np.array(states), np.array(actions), np.array(rewards, dtype=np.float32),
                 np.array(dones, dtype=np.bool), np.array(next_states))
 
-    def update(self) -> None:
+    def update(self) -> Tuple:
         """Retrieves the next step from the experience source and appends to the buffer"""
         exp = self.source.step()
         self.append(exp)
+        return exp.reward, exp.done
 
     def populate(self, warm_start: int) -> None:
-        for _ in range(warm_start):
-            exp = self.source.step()
-            self.append(exp)
+        """Populates the buffer with initial experience"""
+        if warm_start > 0:
+            for _ in range(warm_start):
+                self.source.agent.epsilon = 1.0
+                exp = self.source.step()
+                self.append(exp)
+
+
 
 class MultiStepBuffer:
     """

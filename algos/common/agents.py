@@ -71,6 +71,9 @@ class ValueAgent(Agent):
             Returns:
                 action defined by Q values
         """
+        if not isinstance(state, torch.Tensor):
+            state = torch.tensor([state])
+
         if device.type != 'cpu':
             state = state.cuda(device)
 
@@ -85,7 +88,7 @@ class ValueAgent(Agent):
         Args:
             step: current global step
         """
-        self.epsilon = max(self.eps_end, self.eps_start - step + 1 / self.eps_frames)
+        self.epsilon = max(self.eps_end, self.eps_start - (step + 1) / self.eps_frames)
 
 
 class PolicyAgent(Agent):

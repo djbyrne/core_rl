@@ -19,7 +19,7 @@ class TestModels(TestCase):
         parser.add_argument("--algo", type=str, default="dqn", help="algorithm to use for training")
         args_list = [
             "--algo", "dqn",
-            "--warm_start_steps", "500",
+            "--warm_start_steps", "100",
             "--episode_length", "100"
         ]
         self.hparams = parser.parse_args(args_list)

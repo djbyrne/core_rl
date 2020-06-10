@@ -41,11 +41,11 @@ class ExperienceSource(IterableDataset):
         agent: Agent being used to make decisions
     """
 
-    def __init__(self, env: Env, agent: Agent):
+    def __init__(self, env: Env, agent: Agent, device):
         self.env = env
         self.agent = agent
         self.state = self.env.reset()
-        self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+        self.device = device
 
     def step(self) -> Experience:
         """Takes a single step through the environment"""
