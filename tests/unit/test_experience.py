@@ -7,7 +7,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from algos.common.agents import Agent
-from algos.common.experience import EpisodicExperienceStream, RLDataset, ExperienceSource
+from algos.common.experience import EpisodicExperienceStream, RLDataset, ExperienceSource, NStepExperienceSource
 from algos.common.memory import Experience
 from algos.common.wrappers import ToTensor
 
@@ -58,6 +58,79 @@ class TestExperienceSource(TestCase):
         exp = self.source.step()
         self.assertEqual(len(exp), 5)
 
+
+class TestNStepExperienceSource(TestCase):
+
+    def setUp(self) -> None:
+        self.net = Mock()
+        self.agent = DummyAgent(net=self.net)
+        self.env = gym.make("CartPole-v0")
+        self.n_step = 2
+        self.source = NStepExperienceSource(self.env, self.agent, Mock(), n_steps=self.n_step)
+
+        self.state = np.zeros([32, 32])
+        self.state_02 = np.ones([32, 32])
+        self.next_state = np.zeros([32, 32])
+        self.next_state_02 = np.ones([32, 32])
+        self.action = np.zeros([1])
+        self.action_02 = np.ones([1])
+        self.reward = np.zeros([1])
+        self.reward_02 = np.ones([1])
+        self.done = np.zeros([1])
+        self.done_02 = np.zeros([1])
+
+        self.experience01 = Experience(self.state, self.action, self.reward, self.done, self.next_state)
+        self.experience02 = Experience(self.state_02, self.action_02, self.reward_02, self.done_02, self.next_state_02)
+        self.experience03 = Experience(self.state_02, self.action_02, self.reward_02, self.done_02, self.next_state_02)
+
+    def test_step(self):
+        self.assertEqual(len(self.source.n_step_buffer), 0)
+        exp = self.source.step()
+        self.assertEqual(len(exp), 5)
+        self.assertEqual(len(self.source.n_step_buffer), self.n_step)
+
+    def test_multi_step(self):
+        self.source.env.step = Mock(return_value=(self.next_state_02, self.reward_02, self.done_02, Mock()))
+        self.source.n_step_buffer.append(self.experience01)
+        self.source.n_step_buffer.append(self.experience01)
+
+        exp = self.source.step()
+
+        next_state = exp[4]
+        self.assertEqual(next_state.all(), self.next_state_02.all())
+
+    def test_discounted_transition(self):
+        self.source = NStepExperienceSource(self.env, self.agent, Mock(), n_steps=3)
+
+        self.source.n_step_buffer.append(self.experience01)
+        self.source.n_step_buffer.append(self.experience02)
+        self.source.n_step_buffer.append(self.experience03)
+
+        reward, next_state, done = self.source.get_transition_info()
+
+        reward_01 = self.experience02.reward + 0.9 * self.experience03.reward * (1 - done)
+        reward_gt = self.experience01.reward + 0.9 * reward_01 * (1 - done)
+
+        self.assertEqual(reward, reward_gt)
+        self.assertEqual(next_state.all(), self.next_state_02.all())
+        self.assertEqual(self.experience03.done, done)
+
+    def test_multi_step_discount(self):
+        self.source = NStepExperienceSource(self.env, self.agent, Mock(), n_steps=3)
+        self.source.env.step = Mock(return_value=(self.next_state_02, self.reward_02, self.done_02, Mock()))
+
+        self.source.n_step_buffer.append(self.experience01)
+        self.source.n_step_buffer.append(self.experience02)
+
+        reward_gt = 1.71
+
+        exp = self.source.step()
+
+        self.assertEqual(exp[0].all(), self.experience01.state.all())
+        self.assertEqual(exp[1], self.experience01.action)
+        self.assertEqual(exp[2], reward_gt)
+        self.assertEqual(exp[3], self.experience02.done)
+        self.assertEqual(exp[4].all(), self.experience02.new_state.all())
 
 class TestRLDataset(TestCase):
 

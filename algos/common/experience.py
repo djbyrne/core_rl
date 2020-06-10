@@ -1,6 +1,8 @@
 """Experience sources to be used as datasets for Ligthning DataLoaders"""
+from collections import deque
 from typing import List, Union, Tuple
 
+import numpy as np
 import torch
 from gym import Env
 from torch.utils.data import IterableDataset
@@ -58,6 +60,73 @@ class ExperienceSource(IterableDataset):
             self.state = self.env.reset()
 
         return experience
+
+
+class NStepExperienceSource(ExperienceSource):
+
+    def __init__(self, env: Env, agent: Agent, device, n_steps: int = 1):
+        super().__init__(env, agent, device)
+        self.n_steps = n_steps
+        self.n_step_buffer = deque(maxlen=n_steps)
+
+    def step(self) -> Experience:
+        """
+        Takes an n-step in the environment
+
+        Returns:
+            Experience
+        """
+        self.single_step()
+
+        while len(self.n_step_buffer) < self.n_steps:
+            self.single_step()
+
+        reward, next_state, done = self.get_transition_info()
+        first_experience = self.n_step_buffer[0]
+        multi_step_experience = Experience(first_experience.state,
+                                           first_experience.action,
+                                           reward,
+                                           done,
+                                           next_state)
+
+        return multi_step_experience
+
+    def single_step(self) -> Experience:
+        """
+        Takes a  single step in the environment and appends it to the n-step buffer
+
+        Returns:
+            Experience
+        """
+        exp = super().step()
+        self.n_step_buffer.append(exp)
+        return exp
+
+    def get_transition_info(self, gamma=0.9) -> Tuple[np.float, np.array, np.int]:
+        """
+        get the accumulated transition info for the n_step_buffer
+        Args:
+            gamma: discount factor
+
+        Returns:
+            multi step reward, final observation and done
+        """
+        last_experience = self.n_step_buffer[-1]
+        final_state = last_experience.new_state
+        done = last_experience.done
+        reward = last_experience.reward
+
+        # calculate reward
+        # in reverse order, go through all the experiences up till the first experience
+        for experience in reversed(list(self.n_step_buffer)[:-1]):
+            reward_t = experience.reward
+            new_state_t = experience.new_state
+            done_t = experience.done
+
+            reward = reward_t + gamma * reward * (1 - done_t)
+            final_state, done = (new_state_t, done_t) if done_t else (final_state, done)
+
+        return reward, final_state, done
 
 
 class EpisodicExperienceStream(ExperienceSource):

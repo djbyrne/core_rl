@@ -16,9 +16,8 @@ import torch
 
 from algos.common import wrappers
 from algos.common.agents import ValueAgent
-from algos.common.experience import ExperienceSource
-from algos.common.memory import MultiStepBuffer
-from algos.dqn.core import Agent
+from algos.common.experience import NStepExperienceSource
+from algos.common.memory import ReplayBuffer
 from algos.dqn.model import DQNLightning
 
 
@@ -43,8 +42,8 @@ class NStepDQNLightning(DQNLightning):
 
         self.agent = ValueAgent(self.net, self.n_actions, eps_start=hparams.eps_start,
                                eps_end=hparams.eps_end, eps_frames=hparams.eps_last_frame)
-        self.source = ExperienceSource(self.env, self.agent, device)
-        self.buffer = MultiStepBuffer(self.source, self.hparams.replay_size, self.hparams.warm_start_size)
+        self.source = NStepExperienceSource(self.env, self.agent, device)
+        self.buffer = ReplayBuffer(self.source, self.hparams.replay_size, self.hparams.warm_start_size)
 
         self.total_reward = 0
         self.episode_reward = 0
