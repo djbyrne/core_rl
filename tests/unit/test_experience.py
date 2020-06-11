@@ -55,7 +55,7 @@ class TestExperienceSource(TestCase):
         self.source = ExperienceSource(self.env, self.agent, Mock())
 
     def test_step(self):
-        exp = self.source.step()
+        exp, reward, done = self.source.step()
         self.assertEqual(len(exp), 5)
 
 
@@ -85,7 +85,7 @@ class TestNStepExperienceSource(TestCase):
 
     def test_step(self):
         self.assertEqual(len(self.source.n_step_buffer), 0)
-        exp = self.source.step()
+        exp, reward, done = self.source.step()
         self.assertEqual(len(exp), 5)
         self.assertEqual(len(self.source.n_step_buffer), self.n_step)
 
@@ -94,7 +94,7 @@ class TestNStepExperienceSource(TestCase):
         self.source.n_step_buffer.append(self.experience01)
         self.source.n_step_buffer.append(self.experience01)
 
-        exp = self.source.step()
+        exp, reward, done = self.source.step()
 
         next_state = exp[4]
         self.assertEqual(next_state.all(), self.next_state_02.all())
@@ -124,13 +124,14 @@ class TestNStepExperienceSource(TestCase):
 
         reward_gt = 1.71
 
-        exp = self.source.step()
+        exp, reward, done = self.source.step()
 
         self.assertEqual(exp[0].all(), self.experience01.state.all())
         self.assertEqual(exp[1], self.experience01.action)
         self.assertEqual(exp[2], reward_gt)
         self.assertEqual(exp[3], self.experience02.done)
         self.assertEqual(exp[4].all(), self.experience02.new_state.all())
+
 
 class TestRLDataset(TestCase):
 

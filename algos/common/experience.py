@@ -3,7 +3,6 @@ from collections import deque
 from typing import List, Union, Tuple
 
 import numpy as np
-import torch
 from gym import Env
 from torch.utils.data import IterableDataset
 from algos.common.agents import Agent
@@ -49,7 +48,7 @@ class ExperienceSource(IterableDataset):
         self.state = self.env.reset()
         self.device = device
 
-    def step(self) -> Experience:
+    def step(self) -> Tuple[Experience, float, bool]:
         """Takes a single step through the environment"""
         action = self.agent(self.state, self.device)
         new_state, reward, done, _ = self.env.step(action)
@@ -59,7 +58,7 @@ class ExperienceSource(IterableDataset):
         if done:
             self.state = self.env.reset()
 
-        return experience
+        return experience, reward, done
 
 
 class NStepExperienceSource(ExperienceSource):
@@ -69,14 +68,14 @@ class NStepExperienceSource(ExperienceSource):
         self.n_steps = n_steps
         self.n_step_buffer = deque(maxlen=n_steps)
 
-    def step(self) -> Experience:
+    def step(self) -> Tuple[Experience, float, bool]:
         """
         Takes an n-step in the environment
 
         Returns:
             Experience
         """
-        self.single_step()
+        exp = self.single_step()
 
         while len(self.n_step_buffer) < self.n_steps:
             self.single_step()
@@ -89,7 +88,7 @@ class NStepExperienceSource(ExperienceSource):
                                            done,
                                            next_state)
 
-        return multi_step_experience
+        return multi_step_experience, exp.reward, exp.done
 
     def single_step(self) -> Experience:
         """
@@ -98,7 +97,7 @@ class NStepExperienceSource(ExperienceSource):
         Returns:
             Experience
         """
-        exp = super().step()
+        exp, _, _ = super().step()
         self.n_step_buffer.append(exp)
         return exp
 

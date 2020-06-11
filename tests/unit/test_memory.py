@@ -12,14 +12,14 @@ from algos.common.memory import ReplayBuffer, Experience, PERBuffer, MultiStepBu
 class TestBuffer(TestCase):
 
     def setUp(self) -> None:
-        mock_states = np.random.rand(4, 84, 84)
-        mock_action = np.random.rand(1)
-        mock_rewards = np.random.rand(1)
-        mock_dones = np.random.rand(1)
-        mock_next_states = np.random.rand(4, 84, 84)
-        self.sample = mock_states, mock_action, mock_rewards, mock_dones, mock_next_states
+        self.state = np.random.rand(4, 84, 84)
+        self.next_state = np.random.rand(4, 84, 84)
+        self.action = np.ones([1])
+        self.reward = np.ones([1])
+        self.done = np.zeros([1])
+        self.experience = Experience(self.state, self.action, self.reward, self.done, self.next_state)
         self.source = Mock()
-        self.source.step = Mock(return_value=self.sample)
+        self.source.step = Mock(return_value=(self.experience, torch.tensor(0), False))
         self.batch_size = 32
         self.buffer = Buffer(self.source)
 
@@ -60,12 +60,6 @@ class TestBuffer(TestCase):
 class TestReplayBuffer(TestCase):
 
     def setUp(self) -> None:
-        # mock_states = np.random.rand(4, 84, 84)
-        # mock_action = np.random.rand(1)
-        # mock_rewards = np.random.rand(1)
-        # mock_dones = np.random.rand(1)
-        # mock_next_states = np.random.rand(4, 84, 84)
-        # self.sample = mock_states, mock_action, mock_rewards, mock_dones, mock_next_states
         self.state = np.random.rand(32, 32)
         self.next_state = np.random.rand(32, 32)
         self.action = np.ones([1])
@@ -74,7 +68,7 @@ class TestReplayBuffer(TestCase):
         self.experience = Experience(self.state, self.action, self.reward, self.done, self.next_state)
 
         self.source = Mock()
-        self.source.step = Mock(return_value=self.experience)
+        self.source.step = Mock(return_value=(self.experience, torch.tensor(0), False))
         self.warm_start = 10
         self.buffer = ReplayBuffer(self.source, 20, warm_start=self.warm_start)
 

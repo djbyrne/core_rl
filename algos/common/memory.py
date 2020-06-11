@@ -34,12 +34,12 @@ class Buffer:
         """
         states, actions, rewards, dones, next_states = [], [], [], [], []
         for sample in range(sample_size):
-            state, action, reward, done, next_state = self.source.step()
-            states.append(state)
-            actions.append(action)
-            rewards.append(reward)
-            dones.append(done)
-            next_states.append(next_state)
+            exp, _, _ = self.source.step()
+            states.append(exp.state)
+            actions.append(exp.action)
+            rewards.append(exp.reward)
+            dones.append(exp.done)
+            next_states.append(exp.new_state)
 
         return np.array(states), np.array(actions), np.array(rewards), np.array(dones), np.array(next_states)
 
@@ -79,9 +79,6 @@ class ReplayBuffer(Buffer):
             a batch of tuple np arrays of state, action, reward, done, next_state
         """
 
-        # update buffer with latest experience
-        # self.update()
-
         indices = np.random.choice(len(self.buffer), batch_size, replace=False)
         states, actions, rewards, dones, next_states = zip(*[self.buffer[idx] for idx in indices])
 
@@ -90,47 +87,38 @@ class ReplayBuffer(Buffer):
 
     def update(self) -> Tuple:
         """Retrieves the next step from the experience source and appends to the buffer"""
-        exp = self.source.step()
+        exp, reward, done = self.source.step()
         self.append(exp)
-        return exp.reward, exp.done
+        return reward, done
 
     def populate(self, warm_start: int) -> None:
         """Populates the buffer with initial experience"""
         if warm_start > 0:
             for _ in range(warm_start):
                 self.source.agent.epsilon = 1.0
-                exp = self.source.step()
+                exp, _, _ = self.source.step()
                 self.append(exp)
 
 
-class MultiStepBuffer(Buffer):
+class MultiStepBuffer:
     """
     N Step Replay Buffer
+
+    Deprecated: use the NStepExperienceSource with the standard ReplayBuffer
     """
-    def __init__(self, source, capacity: int, warm_start: int, n_step=2):
-        super().__init__(source)
+    def __init__(self, buffer_size, n_step=2):
         self.n_step = n_step
-        self.buffer = deque(maxlen=capacity)
+        self.buffer = deque(maxlen=buffer_size)
         self.n_step_buffer = deque(maxlen=n_step)
-        self.populate(warm_start)
 
     def __len__(self):
         return len(self.buffer)
-
-    def populate(self, warm_start: int) -> None:
-        """Populates the buffer with initial experience"""
-        if warm_start > 0:
-            for _ in range(warm_start):
-                self.source.agent.epsilon = 1.0
-                exp = self.source.step()
-                self.append(exp)
 
     def get_transition_info(self, gamma=0.9) -> Tuple[np.float, np.array, np.int]:
         """
         get the accumulated transition info for the n_step_buffer
         Args:
             gamma: discount factor
-
         Returns:
             multi step reward, final observation and done
         """
@@ -170,18 +158,11 @@ class MultiStepBuffer(Buffer):
 
             self.buffer.append(multi_step_experience)
 
-    def update(self) -> Tuple:
-        """Retrieves the next step from the experience source and appends to the buffer"""
-        exp = self.source.step()
-        self.append(exp)
-        return exp.reward, exp.done
-
     def sample(self, batch_size: int) -> Tuple:
         """
         Takes a sample of the buffer
         Args:
             batch_size: current batch_size
-
         Returns:
             a batch of tuple np arrays of Experiences
         """
