@@ -1,12 +1,12 @@
 """Experience sources to be used as datasets for Ligthning DataLoaders"""
 from collections import deque
-from typing import List, Union, Tuple
+from typing import List, Tuple
 
 import numpy as np
 from gym import Env
 from torch.utils.data import IterableDataset
 from algos.common.agents import Agent
-from algos.common.memory import Experience, MeanBuffer, ReplayBuffer
+from algos.common.memory import Experience, Buffer
 
 
 class RLDataset(IterableDataset):
@@ -19,7 +19,7 @@ class RLDataset(IterableDataset):
         sample_size: number of experiences to sample at a time
     """
 
-    def __init__(self, buffer: ReplayBuffer, sample_size: int = 1) -> None:
+    def __init__(self, buffer: Buffer, sample_size: int = 1) -> None:
         self.buffer = buffer
         self.sample_size = sample_size
 
@@ -33,7 +33,25 @@ class RLDataset(IterableDataset):
         return None
 
 
-class ExperienceSource(IterableDataset):
+class PrioRLDataset(RLDataset):
+    """
+    Iterable Dataset containing the ExperienceBuffer
+    which will be updated with new experiences during training
+
+    Args:
+        buffer: replay buffer
+        sample_size: number of experiences to sample at a time
+    """
+
+    def __iter__(self) -> Tuple:
+        samples, indices, weights = self.buffer.sample(self.sample_size)
+
+        states, actions, rewards, dones, new_states = samples
+        for idx, _ in enumerate(dones):
+            yield (states[idx], actions[idx], rewards[idx], dones[idx], new_states[idx]), indices[idx], weights[idx]
+
+
+class ExperienceSource:
     """
     Basic single step experience source
 
@@ -62,7 +80,7 @@ class ExperienceSource(IterableDataset):
 
 
 class NStepExperienceSource(ExperienceSource):
-
+    """Expands upon the basic ExperienceSource by collecting experience across N steps"""
     def __init__(self, env: Env, agent: Agent, device, n_steps: int = 1):
         super().__init__(env, agent, device)
         self.n_steps = n_steps

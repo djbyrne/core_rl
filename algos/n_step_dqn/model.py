@@ -20,7 +20,6 @@ from algos.common.experience import NStepExperienceSource
 from algos.common.memory import ReplayBuffer
 from algos.dqn.model import DQNLightning
 
-
 class NStepDQNLightning(DQNLightning):
     """ NStep DQN Model """
 
@@ -41,7 +40,7 @@ class NStepDQNLightning(DQNLightning):
         self.build_networks()
 
         self.agent = ValueAgent(self.net, self.n_actions, eps_start=hparams.eps_start,
-                               eps_end=hparams.eps_end, eps_frames=hparams.eps_last_frame)
+                                eps_end=hparams.eps_end, eps_frames=hparams.eps_last_frame)
         self.source = NStepExperienceSource(self.env, self.agent, device, n_steps=self.hparams.n_steps)
         self.buffer = ReplayBuffer(self.hparams.replay_size)
 

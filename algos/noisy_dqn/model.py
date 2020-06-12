@@ -10,14 +10,9 @@ After ~1500 steps, you will see the total_reward hitting the max score of 200. O
 see the metrics:
 tensorboard --logdir default
 """
-from collections import OrderedDict
-from typing import Tuple
-
-import torch
 
 from algos.common.networks import NoisyCNN
 from algos.dqn.model import DQNLightning
-from algos.noisy_dqn.core import NoisyAgent
 
 
 class NoisyDQNLightning(DQNLightning):

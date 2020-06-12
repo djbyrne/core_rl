@@ -35,6 +35,7 @@ class Buffer:
         """
         self.buffer.append(experience)
 
+    # pylint: disable=unused-argument
     def sample(self, *args) -> Union[Tuple, List[Tuple]]:
         """
         returns everything in the buffer so far it is then reset

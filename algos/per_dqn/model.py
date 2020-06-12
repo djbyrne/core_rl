@@ -17,11 +17,9 @@ import torch
 from torch.utils.data import DataLoader
 
 from algos.common.agents import ValueAgent
-from algos.common.experience import ExperienceSource
-from algos.common.memory import PERBuffer, ReplayBuffer
-from algos.dqn.core import Agent
+from algos.common.experience import ExperienceSource, PrioRLDataset
+from algos.common.memory import PERBuffer
 from algos.dqn.model import DQNLightning
-from algos.per_dqn.core import PrioRLDataset
 
 
 class PERDQNLightning(DQNLightning):
