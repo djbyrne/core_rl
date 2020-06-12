@@ -21,9 +21,10 @@ from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 from algos.common import wrappers
+from algos.common.agents import ValueAgent
+from algos.common.experience import ExperienceSource, RLDataset
 from algos.common.memory import ReplayBuffer
 from algos.common.networks import CNN
-from algos.dqn.core import RLDataset, Agent
 
 
 class DQNLightning(pl.LightningModule):
@@ -33,6 +34,8 @@ class DQNLightning(pl.LightningModule):
         super().__init__()
         self.hparams = hparams
 
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
         self.env = wrappers.make_env(self.hparams.env)
         self.env.seed(123)
 
@@ -41,34 +44,35 @@ class DQNLightning(pl.LightningModule):
 
         self.net = None
         self.target_net = None
+        self.buffer = None
         self.build_networks()
 
-        self.buffer = ReplayBuffer(self.hparams.replay_size)
-        self.agent = Agent(self.env, self.buffer)
+        self.agent = ValueAgent(self.net, self.n_actions, eps_start=hparams.eps_start,
+                                eps_end=hparams.eps_end, eps_frames=hparams.eps_last_frame)
+        self.source = ExperienceSource(self.env, self.agent, device)
 
         self.total_reward = 0
         self.episode_reward = 0
         self.episode_count = 0
         self.episode_steps = 0
         self.total_episode_steps = 0
+        self.reward_list = []
+        for _ in range(100):
+            self.reward_list.append(-21)
+        self.avg_reward = 0
 
-        self.populate(self.hparams.warm_start_steps)
+    def populate(self, warm_start: int) -> None:
+        """Populates the buffer with initial experience"""
+        if warm_start > 0:
+            for _ in range(warm_start):
+                self.source.agent.epsilon = 1.0
+                exp, _, _ = self.source.step()
+                self.buffer.append(exp)
 
     def build_networks(self) -> None:
         """Initializes the DQN train and target networks"""
         self.net = CNN(self.obs_shape, self.n_actions)
         self.target_net = CNN(self.obs_shape, self.n_actions)
-
-    def populate(self, steps: int = 1000) -> None:
-        """
-        Carries out several random steps through the environment to initially fill
-        up the replay buffer with experiences
-
-        Args:
-            steps: number of random steps to populate the buffer with
-        """
-        for _ in range(steps):
-            self.agent.play_step(self.net, epsilon=1.0)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -118,12 +122,12 @@ class DQNLightning(pl.LightningModule):
         Returns:
             Training loss and log metrics
         """
-        device = self.get_device(batch)
-        epsilon = max(self.hparams.eps_end, self.hparams.eps_start -
-                      (self.global_step + 1) / self.hparams.eps_last_frame)
+        self.agent.update_epsilon(self.global_step)
 
-        # step through environment with agent
-        reward, done = self.agent.play_step(self.net, epsilon, device)
+        # step through environment with agent and add to buffer
+        exp, reward, done = self.source.step()
+        self.buffer.append(exp)
+
         self.episode_reward += reward
         self.episode_steps += 1
 
@@ -135,6 +139,8 @@ class DQNLightning(pl.LightningModule):
 
         if done:
             self.total_reward = self.episode_reward
+            self.reward_list.append(self.total_reward)
+            self.avg_reward = sum(self.reward_list[-100:]) / 100
             self.episode_count += 1
             self.episode_reward = 0
             self.total_episode_steps = self.episode_steps
@@ -144,15 +150,17 @@ class DQNLightning(pl.LightningModule):
         if self.global_step % self.hparams.sync_rate == 0:
             self.target_net.load_state_dict(self.net.state_dict())
 
-        log = {'total_reward': torch.tensor(self.total_reward).to(device),
+        log = {'total_reward': torch.tensor(self.total_reward).to(self.device),
+               'avg_reward': torch.tensor(self.avg_reward),
                'train_loss': loss,
                'episode_steps': torch.tensor(self.total_episode_steps)
                }
-        status = {'steps': torch.tensor(self.global_step).to(device),
-                  'total_reward': torch.tensor(self.total_reward).to(device),
+        status = {'steps': torch.tensor(self.global_step).to(self.device),
+                  'avg_reward': torch.tensor(self.avg_reward),
+                  'total_reward': torch.tensor(self.total_reward).to(self.device),
                   'episodes': self.episode_count,
                   'episode_steps': self.episode_steps,
-                  'epsilon': epsilon
+                  'epsilon': self.agent.epsilon
                   }
 
         return OrderedDict({'loss': loss, 'log': log, 'progress_bar': status})
@@ -164,6 +172,9 @@ class DQNLightning(pl.LightningModule):
 
     def _dataloader(self) -> DataLoader:
         """Initialize the Replay Buffer dataset used for retrieving experiences"""
+        self.buffer = ReplayBuffer(self.hparams.replay_size)
+        self.populate(self.hparams.warm_start_size)
+
         dataset = RLDataset(self.buffer, self.hparams.episode_length)
         dataloader = DataLoader(dataset=dataset,
                                 batch_size=self.hparams.batch_size,
@@ -173,10 +184,6 @@ class DQNLightning(pl.LightningModule):
     def train_dataloader(self) -> DataLoader:
         """Get train loader"""
         return self._dataloader()
-
-    def get_device(self, batch) -> str:
-        """Retrieve device currently being used by minibatch"""
-        return batch[0].device.index if self.on_gpu else 'cpu'
 
     @staticmethod
     def add_model_specific_args(parent) -> argparse.ArgumentParser:

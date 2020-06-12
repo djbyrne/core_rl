@@ -48,7 +48,8 @@ def main(hparams) -> None:
         distributed_backend=hparams.backend,
         max_steps=hparams.max_steps,
         max_epochs=hparams.max_steps,       # Set this as the same as max steps to ensure that it doesn't stop early
-        val_check_interval=1000             # This just needs 'some' value, does not effect training right now
+        val_check_interval=1000,             # This just needs 'some' value, does not effect training right now
+        profiler=True
     )
 
     trainer.fit(model)

@@ -1,5 +1,7 @@
 import argparse
 from unittest import TestCase
+from unittest.mock import Mock
+
 import numpy as np
 import gym
 import torch
@@ -20,7 +22,7 @@ class TestVPG(TestCase):
         self.n_actions = self.env.action_space.n
         self.net = MLP(self.obs_shape, self.n_actions)
         self.agent = Agent(self.net)
-        self.xp_stream = EpisodicExperienceStream(self.env, self.agent, episodes=4)
+        self.xp_stream = EpisodicExperienceStream(self.env, self.agent, Mock(), episodes=4)
         self.rl_dataloader = DataLoader(self.xp_stream)
 
         parent_parser = argparse.ArgumentParser(add_help=False)

@@ -5,7 +5,7 @@ from unittest.mock import Mock
 import gym
 import torch
 
-from algos.common.agents import Agent, PolicyAgent
+from algos.common.agents import Agent, PolicyAgent, ValueAgent
 
 
 class TestAgents(TestCase):
@@ -21,13 +21,37 @@ class TestAgents(TestCase):
         self.assertIsInstance(action, int)
 
 
+class TestValueAgent(TestCase):
+
+    def setUp(self) -> None:
+        self.env = gym.make("CartPole-v0")
+        self.net = Mock(return_value=torch.Tensor([[0.0, 100.0]]))
+        self.state = torch.tensor(self.env.reset())
+        self.device = self.state.device
+        self.value_agent = ValueAgent(self.net, self.env.action_space.n)
+
+    def test_value_agent(self):
+
+        action = self.value_agent(self.state, self.device)
+        self.assertIsInstance(action, int)
+
+    def test_value_agent_GET_ACTION(self):
+        action = self.value_agent.get_action(self.state, self.device)
+        self.assertIsInstance(action, int)
+        self.assertEqual(action, 1)
+
+    def test_value_agent_RANDOM(self):
+        action = self.value_agent.get_random_action()
+        self.assertIsInstance(action, int)
+
+
 class TestPolicyAgent(TestCase):
 
     def setUp(self) -> None:
         self.env = gym.make("CartPole-v0")
         self.net = Mock(return_value=torch.Tensor([0.0, 100.0]))
         self.state = torch.tensor(self.env.reset())
-        self.device = 'cpu'
+        self.device = self.state.device
 
     def test_policy_agent(self):
         policy_agent = PolicyAgent(self.net)
