@@ -105,7 +105,7 @@ class PolicyAgent(Agent):
         Returns:
             action defined by policy
         """
-        if device not in ['cpu']:
+        if device.type != 'cpu':
             state = state.cuda(device)
 
         # get the logits and pass through softmax for probability distribution

@@ -8,19 +8,21 @@ from algos.dueling_dqn.model import DuelingDQNLightning
 from algos.n_step_dqn.model import NStepDQNLightning
 from algos.noisy_dqn.model import NoisyDQNLightning
 from algos.per_dqn.model import PERDQNLightning
+from algos.reinforce.model import ReinforceLightning
+from algos.vanilla_policy_gradient.model import VPGLightning
 
 
-
-class TestModels(TestCase):
+class TestPolicyModels(TestCase):
 
     def setUp(self) -> None:
         parent_parser = argparse.ArgumentParser(add_help=False)
-        parser = DQNLightning.add_model_specific_args(parent_parser)
+        parser = VPGLightning.add_model_specific_args(parent_parser)
         parser.add_argument("--algo", type=str, default="dqn", help="algorithm to use for training")
         args_list = [
-            "--algo", "dqn",
+            "--algo", "vpg",
             "--warm_start_steps", "100",
-            "--episode_length", "100"
+            "--episode_length", "100",
+            "--env", "CartPole-v0"
         ]
         self.hparams = parser.parse_args(args_list)
 
@@ -31,44 +33,16 @@ class TestModels(TestCase):
             val_check_interval=1000  # This just needs 'some' value, does not effect training right now
         )
 
-    def test_dqn(self):
+    def test_reinforce(self):
         """Smoke test that the DQN model runs"""
-        model = DQNLightning(self.hparams)
+        model = ReinforceLightning(self.hparams)
         result = self.trainer.fit(model)
 
         self.assertEqual(result, 1)
 
-    def test_double_dqn(self):
+    def test_vpg(self):
         """Smoke test that the Double DQN model runs"""
-        model = DoubleDQNLightning(self.hparams)
-        result = self.trainer.fit(model)
-
-        self.assertEqual(result, 1)
-
-    def test_dueling_dqn(self):
-        """Smoke test that the Dueling DQN model runs"""
-        model = DuelingDQNLightning(self.hparams)
-        result = self.trainer.fit(model)
-
-        self.assertEqual(result, 1)
-
-    def test_noisy_dqn(self):
-        """Smoke test that the Noisy DQN model runs"""
-        model = NoisyDQNLightning(self.hparams)
-        result = self.trainer.fit(model)
-
-        self.assertEqual(result, 1)
-
-    def test_per_dqn(self):
-        """Smoke test that the PER DQN model runs"""
-        model = PERDQNLightning(self.hparams)
-        result = self.trainer.fit(model)
-
-        self.assertEqual(result, 1)
-
-    def test_n_step_dqn(self):
-        """Smoke test that the N Step DQN model runs"""
-        model = NStepDQNLightning(self.hparams)
+        model = VPGLightning(self.hparams)
         result = self.trainer.fit(model)
 
         self.assertEqual(result, 1)

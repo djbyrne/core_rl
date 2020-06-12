@@ -224,7 +224,7 @@ class ReinforceLightning(pl.LightningModule):
 
     def _dataloader(self) -> DataLoader:
         """Initialize the Replay Buffer dataset used for retrieving experiences"""
-        dataset = EpisodicExperienceStream(self.env, self.agent, episodes=self.hparams.batch_episodes)
+        dataset = EpisodicExperienceStream(self.env, self.agent, self.device, episodes=self.hparams.batch_episodes)
         dataloader = DataLoader(dataset=dataset)
         return dataloader
 
