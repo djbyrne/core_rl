@@ -45,14 +45,13 @@ class TestValueAgent(TestCase):
         self.assertIsInstance(action, int)
 
 
-
 class TestPolicyAgent(TestCase):
 
     def setUp(self) -> None:
         self.env = gym.make("CartPole-v0")
         self.net = Mock(return_value=torch.Tensor([0.0, 100.0]))
         self.state = torch.tensor(self.env.reset())
-        self.device = 'cpu'
+        self.device = self.state.device
 
     def test_policy_agent(self):
         policy_agent = PolicyAgent(self.net)

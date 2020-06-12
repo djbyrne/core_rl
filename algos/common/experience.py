@@ -146,7 +146,7 @@ class NStepExperienceSource(ExperienceSource):
         return reward, final_state, done
 
 
-class EpisodicExperienceStream(ExperienceSource):
+class EpisodicExperienceStream(ExperienceSource, IterableDataset):
     """
     Basic experience stream that iteratively yield the current experience of the agent in the env
 
