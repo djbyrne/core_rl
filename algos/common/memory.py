@@ -7,6 +7,7 @@ from collections import deque, namedtuple
 
 import numpy as np
 
+
 Experience = namedtuple(
     'Experience', field_names=['state', 'action', 'reward',
                                'done', 'new_state'])
@@ -19,43 +20,8 @@ class Buffer:
     Args:
         capacity: size of the buffer
     """
-    def __init__(self, source) -> None:
-        self.source = source
-
-    def __len__(self) -> None:
-        return 1
-
-    def sample(self, sample_size=1) -> Union[Tuple, List[Tuple]]:
-        """
-        Takes a sample of the buffer
-
-        Returns:
-            a batch of tuple np arrays of state, action, reward, done, next_state
-        """
-        states, actions, rewards, dones, next_states = [], [], [], [], []
-        for sample in range(sample_size):
-            exp, _, _ = self.source.step()
-            states.append(exp.state)
-            actions.append(exp.action)
-            rewards.append(exp.reward)
-            dones.append(exp.done)
-            next_states.append(exp.new_state)
-
-        return np.array(states), np.array(actions), np.array(rewards), np.array(dones), np.array(next_states)
-
-
-class ReplayBuffer(Buffer):
-    """
-    Replay Buffer for storing past experiences allowing the agent to learn from them
-
-    Args:
-        capacity: size of the buffer
-    """
-
-    def __init__(self, source, capacity: int, warm_start: int) -> None:
-        super().__init__(source)
+    def __init__(self, capacity: int) -> None:
         self.buffer = deque(maxlen=capacity)
-        self.populate(warm_start)
 
     def __len__(self) -> None:
         return len(self.buffer)
@@ -68,6 +34,29 @@ class ReplayBuffer(Buffer):
             experience: tuple (state, action, reward, done, new_state)
         """
         self.buffer.append(experience)
+
+    def sample(self, *args) -> Union[Tuple, List[Tuple]]:
+        """
+        returns everything in the buffer so far it is then reset
+
+        Returns:
+            a batch of tuple np arrays of state, action, reward, done, next_state
+        """
+        states, actions, rewards, dones, next_states = zip(*[self.buffer[idx] for idx in range(self.__len__())])
+
+        self.buffer.clear()
+
+        return (np.array(states), np.array(actions), np.array(rewards, dtype=np.float32),
+                np.array(dones, dtype=np.bool), np.array(next_states))
+
+
+class ReplayBuffer(Buffer):
+    """
+    Replay Buffer for storing past experiences allowing the agent to learn from them
+
+    Args:
+        capacity: size of the buffer
+    """
 
     def sample(self, batch_size: int) -> Tuple:
         """
@@ -84,20 +73,6 @@ class ReplayBuffer(Buffer):
 
         return (np.array(states), np.array(actions), np.array(rewards, dtype=np.float32),
                 np.array(dones, dtype=np.bool), np.array(next_states))
-
-    def update(self) -> Tuple:
-        """Retrieves the next step from the experience source and appends to the buffer"""
-        exp, reward, done = self.source.step()
-        self.append(exp)
-        return reward, done
-
-    def populate(self, warm_start: int) -> None:
-        """Populates the buffer with initial experience"""
-        if warm_start > 0:
-            for _ in range(warm_start):
-                self.source.agent.epsilon = 1.0
-                exp, _, _ = self.source.step()
-                self.append(exp)
 
 
 class MultiStepBuffer:
@@ -200,10 +175,11 @@ class MeanBuffer:
         return self.sum / len(self.deque)
 
 
-class PERBuffer:
+class PERBuffer(ReplayBuffer):
     """simple list based Prioritized Experience Replay Buffer"""
 
     def __init__(self, buffer_size, prob_alpha=0.6, beta_start=0.4, beta_frames=100000):
+        super().__init__(capacity=buffer_size)
         self.beta_start = beta_start
         self.beta = beta_start
         self.beta_frames = beta_frames
@@ -296,9 +272,6 @@ class PERBuffer:
         """
         for idx, prio in zip(batch_indices, batch_priorities):
             self.priorities[idx] = prio
-
-    def __len__(self):
-        return len(self.buffer)
 
 #
 # class SumTree:

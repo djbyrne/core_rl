@@ -20,22 +20,15 @@ class TestBuffer(TestCase):
         self.experience = Experience(self.state, self.action, self.reward, self.done, self.next_state)
         self.source = Mock()
         self.source.step = Mock(return_value=(self.experience, torch.tensor(0), False))
-        self.batch_size = 32
-        self.buffer = Buffer(self.source)
+        self.batch_size = 8
+        self.buffer = Buffer(8)
 
-    def test_sample_single(self):
-        """check that a sinlge sample is returned"""
-        sample = self.buffer.sample(1)
-        self.assertEqual(len(sample), 5)
-        self.assertEqual(sample[0].shape, (1, 4, 84, 84))
-        self.assertEqual(sample[1].shape, (1, 1))
-        self.assertEqual(sample[2].shape, (1, 1))
-        self.assertEqual(sample[3].shape, (1, 1))
-        self.assertEqual(sample[4].shape, (1, 4, 84, 84))
+        for _ in range(self.batch_size):
+            self.buffer.append(self.experience)
 
     def test_sample_batch(self):
         """check that a sinlge sample is returned"""
-        sample = self.buffer.sample(self.batch_size)
+        sample = self.buffer.sample()
         self.assertEqual(len(sample), 5)
         self.assertEqual(sample[0].shape, (self.batch_size, 4, 84, 84))
         self.assertEqual(sample[1].shape, (self.batch_size, 1))
@@ -70,7 +63,9 @@ class TestReplayBuffer(TestCase):
         self.source = Mock()
         self.source.step = Mock(return_value=(self.experience, torch.tensor(0), False))
         self.warm_start = 10
-        self.buffer = ReplayBuffer(self.source, 20, warm_start=self.warm_start)
+        self.buffer = ReplayBuffer(20)
+        for _ in range(self.warm_start):
+            self.buffer.append(self.experience)
 
     def test_replay_buffer_APPEND(self):
         """Test that you can append to the replay buffer"""

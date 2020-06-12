@@ -16,7 +16,9 @@ from typing import Tuple, List
 import torch
 from torch.utils.data import DataLoader
 
-from algos.common.memory import PERBuffer
+from algos.common.agents import ValueAgent
+from algos.common.experience import ExperienceSource
+from algos.common.memory import PERBuffer, ReplayBuffer
 from algos.dqn.core import Agent
 from algos.dqn.model import DQNLightning
 from algos.per_dqn.core import PrioRLDataset
@@ -27,11 +29,11 @@ class PERDQNLightning(DQNLightning):
 
     def __init__(self, hparams):
         super().__init__(hparams)
-
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.agent = ValueAgent(self.net, self.n_actions, eps_start=hparams.eps_start,
+                                eps_end=hparams.eps_end, eps_frames=hparams.eps_last_frame)
+        self.source = ExperienceSource(self.env, self.agent, device)
         self.buffer = PERBuffer(self.hparams.replay_size)
-
-        self.agent = Agent(self.env, self.buffer)
-        self.populate(self.hparams.warm_start_steps)
 
     def training_step(self, batch, _) -> OrderedDict:
         """
@@ -49,12 +51,12 @@ class PERDQNLightning(DQNLightning):
 
         indices = indices.cpu().numpy()
 
-        device = self.get_device(samples)
-        epsilon = max(self.hparams.eps_end, self.hparams.eps_start -
-                      (self.global_step + 1) / self.hparams.eps_last_frame)
+        self.agent.update_epsilon(self.global_step)
 
-        # step through environment with agent
-        reward, done = self.agent.play_step(self.net, epsilon, device)
+        # step through environment with agent and add to buffer
+        exp, reward, done = self.source.step()
+        self.buffer.append(exp)
+
         self.episode_reward += reward
         self.episode_steps += 1
 
@@ -70,6 +72,8 @@ class PERDQNLightning(DQNLightning):
 
         if done:
             self.total_reward = self.episode_reward
+            self.reward_list.append(self.total_reward)
+            self.avg_reward = sum(self.reward_list[-100:]) / 100
             self.episode_count += 1
             self.episode_reward = 0
             self.total_episode_steps = self.episode_steps
@@ -79,15 +83,17 @@ class PERDQNLightning(DQNLightning):
         if self.global_step % self.hparams.sync_rate == 0:
             self.target_net.load_state_dict(self.net.state_dict())
 
-        log = {'total_reward': torch.tensor(self.total_reward).to(device),
+        log = {'total_reward': torch.tensor(self.total_reward).to(self.device),
+               'avg_reward': torch.tensor(self.avg_reward),
                'train_loss': loss,
                'episode_steps': torch.tensor(self.total_episode_steps)
                }
-        status = {'steps': torch.tensor(self.global_step).to(device),
-                  'total_reward': torch.tensor(self.total_reward).to(device),
+        status = {'steps': torch.tensor(self.global_step).to(self.device),
+                  'avg_reward': torch.tensor(self.avg_reward),
+                  'total_reward': torch.tensor(self.total_reward).to(self.device),
                   'episodes': self.episode_count,
                   'episode_steps': self.episode_steps,
-                  'epsilon': epsilon
+                  'epsilon': self.agent.epsilon
                   }
 
         return OrderedDict({'loss': loss, 'log': log, 'progress_bar': status})
@@ -120,6 +126,9 @@ class PERDQNLightning(DQNLightning):
 
     def _dataloader(self) -> DataLoader:
         """Initialize the Replay Buffer dataset used for retrieving experiences"""
+        self.buffer = PERBuffer(self.hparams.replay_size)
+        self.populate(self.hparams.warm_start_size)
+
         dataset = PrioRLDataset(self.buffer, self.hparams.batch_size)
         dataloader = DataLoader(dataset=dataset,
                                 batch_size=self.hparams.batch_size,

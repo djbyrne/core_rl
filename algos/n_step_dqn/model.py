@@ -43,7 +43,7 @@ class NStepDQNLightning(DQNLightning):
         self.agent = ValueAgent(self.net, self.n_actions, eps_start=hparams.eps_start,
                                eps_end=hparams.eps_end, eps_frames=hparams.eps_last_frame)
         self.source = NStepExperienceSource(self.env, self.agent, device, n_steps=self.hparams.n_steps)
-        self.buffer = ReplayBuffer(self.source, self.hparams.replay_size, self.hparams.warm_start_size)
+        self.buffer = ReplayBuffer(self.hparams.replay_size)
 
         self.total_reward = 0
         self.episode_reward = 0
