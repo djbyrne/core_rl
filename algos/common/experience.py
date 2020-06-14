@@ -82,7 +82,8 @@ class ExperienceSource:
 
         return experience, reward, done
 
-    def run_episode(self):
+    def run_episode(self) -> float:
+        """Carries out a single episode and returns the total reward. This is used for testing"""
         done = False
         total_reward = 0
 
