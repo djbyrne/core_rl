@@ -49,3 +49,17 @@ conda install pytorch torchvision cudatoolkit=10.1 -c pytorch
 pip install -r requirements.txt
 
 ````
+
+## Quick Start
+Each algorithm implemented has a folder in the algos directory. This contains the Lightning module for each algorith. To train a model, exec the run.py file and specify the algorithm and environment you want to run.
+
+```bash
+python run.py --algo dqn --env PongNoFrameskip-v4
+```
+
+---
+**NOTE**
+
+Currently, the DQN models are hard coded to use a CNN and only work out of the box for the Atari environment. Similarly, the policy gradient methods currently only have a MLP net and is really only tested on the classic control tasks. This will be updated soon!
+
+---
