@@ -66,6 +66,10 @@ class ExperienceSource:
         self.state = self.env.reset()
         self.device = device
 
+    def _reset(self) -> None:
+        """resets the env and state"""
+        self.state = self.env.reset()
+
     def step(self) -> Tuple[Experience, float, bool]:
         """Takes a single step through the environment"""
         action = self.agent(self.state, self.device)
@@ -77,6 +81,17 @@ class ExperienceSource:
             self.state = self.env.reset()
 
         return experience, reward, done
+
+    def run_episode(self) -> float:
+        """Carries out a single episode and returns the total reward. This is used for testing"""
+        done = False
+        total_reward = 0
+
+        while not done:
+            _, reward, done = self.step()
+            total_reward += reward
+
+        return total_reward
 
 
 class NStepExperienceSource(ExperienceSource):

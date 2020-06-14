@@ -2,14 +2,13 @@
 
 import argparse
 import random
-
+import numpy as np
 import torch
+from pytorch_lightning.callbacks import ModelCheckpoint
+import pytorch_lightning as pl
 
 from algos.dqn.model import DQNLightning
 from algos.double_dqn.model import DoubleDQNLightning
-import numpy as np
-import pytorch_lightning as pl
-
 from algos.dueling_dqn.model import DuelingDQNLightning
 from algos.n_step_dqn.model import NStepDQNLightning
 from algos.noisy_dqn.model import NoisyDQNLightning
@@ -25,7 +24,7 @@ def main(hparams) -> None:
     np.random.seed(hparams.seed)
     random.seed(hparams.seed)
 
-    # TODO: this is shit, fix soon
+    # TODO: make this better
     if hparams.algo == 'double_dqn':
         model = DoubleDQNLightning(hparams)
     elif hparams.algo == 'dueling_dqn':
@@ -43,16 +42,26 @@ def main(hparams) -> None:
     else:
         model = DQNLightning(hparams)
 
+    checkpoint_callback = ModelCheckpoint(
+        save_top_k=1,
+        monitor='avg_reward',
+        mode='max',
+        prefix=''
+    )
+
     trainer = pl.Trainer(
+        resume_from_checkpoint="/home/local/CORP/dbyrne/Documents/Projects/RL/baseline_checkpoints/pong/dqn_baseline_v1/checkpoints/epoch=31192.ckpt",
         gpus=hparams.gpus,
         distributed_backend=hparams.backend,
         max_steps=hparams.max_steps,
-        max_epochs=hparams.max_steps,       # Set this as the same as max steps to ensure that it doesn't stop early
-        val_check_interval=1000,             # This just needs 'some' value, does not effect training right now
-        profiler=True
+        max_epochs=hparams.max_steps,
+        val_check_interval=1000,
+        profiler=True,
+        checkpoint_callback=checkpoint_callback
     )
 
     trainer.fit(model)
+    trainer.test()
 
 
 if __name__ == '__main__':

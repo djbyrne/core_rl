@@ -11,7 +11,7 @@ see the metrics:
 tensorboard --logdir default
 """
 
-from typing import Tuple, List
+from typing import Tuple, List, Dict
 import argparse
 from collections import OrderedDict
 import torch
@@ -34,7 +34,7 @@ class DQNLightning(pl.LightningModule):
         super().__init__()
         self.hparams = hparams
 
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        device = torch.device("cuda:0" if self.hparams.gpus > 0 else "cpu")
 
         self.env = wrappers.make_env(self.hparams.env)
         self.env.seed(123)
@@ -59,7 +59,7 @@ class DQNLightning(pl.LightningModule):
         self.reward_list = []
         for _ in range(100):
             self.reward_list.append(-21)
-        self.avg_reward = 0
+        self.avg_reward = -21
 
     def populate(self, warm_start: int) -> None:
         """Populates the buffer with initial experience"""
@@ -163,7 +163,22 @@ class DQNLightning(pl.LightningModule):
                   'epsilon': self.agent.epsilon
                   }
 
-        return OrderedDict({'loss': loss, 'log': log, 'progress_bar': status})
+        return OrderedDict({'loss': loss, 'avg_reward': torch.tensor(self.avg_reward),
+                            'log': log, 'progress_bar': status})
+
+    def test_step(self, *args, **kwargs) -> Dict[str, torch.Tensor]:
+        """Evaluate the agent for 10 episodes"""
+        self.agent.epsilon = 0.0
+        test_reward = self.source.run_episode()
+
+        return {'test_reward': test_reward}
+
+    def test_epoch_end(self, outputs) -> Dict[str, torch.Tensor]:
+        """Log the avg of the test results"""
+        rewards = [x['test_reward'] for x in outputs]
+        avg_reward = sum(rewards) / len(rewards)
+        tensorboard_logs = {'avg_test_reward': avg_reward}
+        return {'avg_test_reward': avg_reward, 'log': tensorboard_logs}
 
     def configure_optimizers(self) -> List[Optimizer]:
         """ Initialize Adam optimizer"""
@@ -183,6 +198,10 @@ class DQNLightning(pl.LightningModule):
 
     def train_dataloader(self) -> DataLoader:
         """Get train loader"""
+        return self._dataloader()
+
+    def test_dataloader(self) -> DataLoader:
+        """Get test loader"""
         return self._dataloader()
 
     @staticmethod
