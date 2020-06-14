@@ -44,7 +44,7 @@ class DoubleDQNLightning(DQNLightning):
         with torch.no_grad():
             next_outputs = self.net(next_states)  # [16, 2], [batch, action_space]
 
-            next_state_acts = next_outputs.max(1)[1].unsqueeze(-1)   # take action at the index with the highest value
+            next_state_acts = next_outputs.max(1)[1].unsqueeze(-1)  # take action at the index with the highest value
             next_tgt_out = self.target_net(next_states)
 
             # Take the value of the action chosen by the train network

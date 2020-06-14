@@ -10,7 +10,6 @@ from algos.noisy_dqn.model import NoisyDQNLightning
 from algos.per_dqn.model import PERDQNLightning
 
 
-
 class TestValueModels(TestCase):
 
     def setUp(self) -> None:
@@ -20,12 +19,13 @@ class TestValueModels(TestCase):
         args_list = [
             "--algo", "dqn",
             "--warm_start_steps", "100",
-            "--episode_length", "100"
+            "--episode_length", "100",
+            "--gpus", "0"
         ]
         self.hparams = parser.parse_args(args_list)
 
         self.trainer = pl.Trainer(
-            gpus=0,
+            gpus=self.hparams.gpus,
             max_steps=100,
             max_epochs=100,  # Set this as the same as max steps to ensure that it doesn't stop early
             val_check_interval=1000  # This just needs 'some' value, does not effect training right now

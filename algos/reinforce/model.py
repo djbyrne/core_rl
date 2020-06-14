@@ -56,6 +56,11 @@ class ReinforceLightning(pl.LightningModule):
         self.episode_steps = 0
         self.total_episode_steps = 0
 
+        self.reward_list = []
+        for _ in range(100):
+            self.reward_list.append(0)
+        self.avg_reward = 0
+
     def build_networks(self) -> None:
         """Initializes the DQN train and target networks"""
         self.net = MLP(self.obs_shape, self.n_actions)
@@ -196,6 +201,8 @@ class ReinforceLightning(pl.LightningModule):
 
         # get avg reward over the batched episodes
         self.episode_reward = sum(batch_rewards) / len(batch)
+        self.reward_list.append(self.episode_reward)
+        self.avg_reward = sum(self.reward_list) / len(self.reward_list)
 
         # calculates training loss
         loss = self.loss(batch_qvals, batch_states, batch_actions)
@@ -206,16 +213,18 @@ class ReinforceLightning(pl.LightningModule):
         self.episode_count += self.hparams.batch_episodes
 
         log = {'episode_reward': torch.tensor(self.episode_reward).to(device),
-               'train_loss': loss
+               'train_loss': loss,
+               'avg_reward': self.avg_reward
                }
         status = {'steps': torch.tensor(self.global_step).to(device),
                   'episode_reward': torch.tensor(self.episode_reward).to(device),
-                  'episodes': torch.tensor(self.episode_count)
+                  'episodes': torch.tensor(self.episode_count),
+                  'avg_reward': self.avg_reward
                   }
 
         self.episode_reward = 0
 
-        return OrderedDict({'loss': loss, 'log': log, 'progress_bar': status})
+        return OrderedDict({'loss': loss, 'reward': self.avg_reward, 'log': log, 'progress_bar': status})
 
     def configure_optimizers(self) -> List[Optimizer]:
         """ Initialize Adam optimizer"""

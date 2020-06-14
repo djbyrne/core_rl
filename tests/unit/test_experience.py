@@ -58,6 +58,10 @@ class TestExperienceSource(TestCase):
         exp, reward, done = self.source.step()
         self.assertEqual(len(exp), 5)
 
+    def test_episode(self):
+        total_reward = self.source.run_episode()
+        self.assertIsInstance(total_reward, float)
+
 
 class TestNStepExperienceSource(TestCase):
 
