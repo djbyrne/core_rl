@@ -7,6 +7,7 @@ import torch
 from pytorch_lightning.callbacks import ModelCheckpoint
 import pytorch_lightning as pl
 
+from algos.common import cli
 from algos.dqn.model import DQNLightning
 from algos.double_dqn.model import DoubleDQNLightning
 from algos.dueling_dqn.model import DuelingDQNLightning
@@ -50,7 +51,6 @@ def main(hparams) -> None:
     )
 
     trainer = pl.Trainer(
-        resume_from_checkpoint="/home/local/CORP/dbyrne/Documents/Projects/RL/baseline_checkpoints/pong/dqn_baseline_v1/checkpoints/epoch=31192.ckpt",
         gpus=hparams.gpus,
         distributed_backend=hparams.backend,
         max_steps=hparams.max_steps,
@@ -66,8 +66,10 @@ def main(hparams) -> None:
 
 if __name__ == '__main__':
     parent_parser = argparse.ArgumentParser(add_help=False)
-    parser = DQNLightning.add_model_specific_args(parent_parser)
-    parser.add_argument("--algo", type=str, default="dqn", help="algorithm to use for training")
-    args = parser.parse_args()
+    parent_parser = cli.add_base_args(parent=parent_parser)
+    parent_parser = DQNLightning.add_model_specific_args(parent_parser)
+    parent_parser = VPGLightning.add_model_specific_args(parent_parser)
+
+    args = parent_parser.parse_args()
 
     main(args)

@@ -2,6 +2,7 @@ import argparse
 from unittest import TestCase
 import pytorch_lightning as pl
 
+from algos.common import cli
 from algos.double_dqn.model import DoubleDQNLightning
 from algos.dqn.model import DQNLightning
 from algos.dueling_dqn.model import DuelingDQNLightning
@@ -16,15 +17,14 @@ class TestPolicyModels(TestCase):
 
     def setUp(self) -> None:
         parent_parser = argparse.ArgumentParser(add_help=False)
-        parser = VPGLightning.add_model_specific_args(parent_parser)
-        parser.add_argument("--algo", type=str, default="dqn", help="algorithm to use for training")
+        parent_parser = cli.add_base_args(parent=parent_parser)
+        parent_parser = VPGLightning.add_model_specific_args(parent_parser)
         args_list = [
             "--algo", "vpg",
-            "--warm_start_steps", "100",
             "--episode_length", "100",
             "--env", "CartPole-v0"
         ]
-        self.hparams = parser.parse_args(args_list)
+        self.hparams = parent_parser.parse_args(args_list)
 
         self.trainer = pl.Trainer(
             gpus=0,

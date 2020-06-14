@@ -6,6 +6,7 @@ import gym
 import torch
 from torch.utils.data import DataLoader
 
+from algos.common import cli
 from algos.common.agents import Agent
 from algos.common.experience import EpisodicExperienceStream
 from algos.common.networks import MLP
@@ -26,14 +27,14 @@ class TestReinforce(TestCase):
         self.rl_dataloader = DataLoader(self.xp_stream)
 
         parent_parser = argparse.ArgumentParser(add_help=False)
-        parser = DQNLightning.add_model_specific_args(parent_parser)
-        parser.add_argument("--algo", type=str, default="dqn", help="algorithm to use for training")
+        parent_parser = cli.add_base_args(parent=parent_parser)
+        parent_parser = DQNLightning.add_model_specific_args(parent_parser)
         args_list = [
             "--algo", "dqn",
             "--warm_start_steps", "500",
             "--episode_length", "100",
         ]
-        self.hparams = parser.parse_args(args_list)
+        self.hparams = parent_parser.parse_args(args_list)
 
         self.model = ReinforceLightning(self.hparams)
 
