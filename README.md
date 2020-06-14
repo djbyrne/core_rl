@@ -23,7 +23,7 @@ Most of these algorithms were based off the implementations found in
 - [ ] SAC
 
 ### On Policy
-- [ ] REINFORCE
+- [X] REINFORCE/Vanilla Policy Gradient
 - [ ] A3C
 - [ ] A2C
 - [ ] PPO
