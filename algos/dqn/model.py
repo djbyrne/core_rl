@@ -205,7 +205,7 @@ class DQNLightning(pl.LightningModule):
         return self._dataloader()
 
     @staticmethod
-    def add_model_specific_args(parent) -> argparse.ArgumentParser:
+    def add_model_specific_args(arg_parser) -> argparse.ArgumentParser:
         """
         Adds arguments for DQN model
 
@@ -214,12 +214,6 @@ class DQNLightning(pl.LightningModule):
         Args:
             parent
         """
-        arg_parser = argparse.ArgumentParser(parents=[parent])
-
-        arg_parser.add_argument("--batch_size", type=int, default=32, help="size of the batches")
-        arg_parser.add_argument("--lr", type=float, default=1e-4, help="learning rate")
-        arg_parser.add_argument("--env", type=str, default="PongNoFrameskip-v4", help="gym environment tag")
-        arg_parser.add_argument("--gamma", type=float, default=0.99, help="discount factor")
         arg_parser.add_argument("--sync_rate", type=int, default=1000,
                                 help="how many frames do we update the target network")
         arg_parser.add_argument("--replay_size", type=int, default=100000,
@@ -230,19 +224,7 @@ class DQNLightning(pl.LightningModule):
                                 help="what frame should epsilon stop decaying")
         arg_parser.add_argument("--eps_start", type=float, default=1.0, help="starting value of epsilon")
         arg_parser.add_argument("--eps_end", type=float, default=0.02, help="final value of epsilon")
-        arg_parser.add_argument("--episode_length", type=int, default=500, help="max length of an episode")
-        arg_parser.add_argument("--max_episode_reward", type=int, default=18,
-                                help="max episode reward in the environment")
         arg_parser.add_argument("--warm_start_steps", type=int, default=10000,
                                 help="max episode reward in the environment")
-        arg_parser.add_argument("--max_steps", type=int, default=500000,
-                                help="max steps to train the agent")
-        arg_parser.add_argument("--n_steps", type=int, default=4,
-                                help="how many steps to unroll for each update")
-        arg_parser.add_argument("--gpus", type=int, default=1,
-                                help="number of gpus to use for training")
-        arg_parser.add_argument("--seed", type=int, default=123,
-                                help="seed for training run")
-        arg_parser.add_argument("--backend", type=str, default="dp",
-                                help="distributed backend to be used by lightning")
+
         return arg_parser
