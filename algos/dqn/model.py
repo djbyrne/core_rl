@@ -58,8 +58,8 @@ class DQNLightning(pl.LightningModule):
         self.total_episode_steps = 0
         self.reward_list = []
         for _ in range(100):
-            self.reward_list.append(-21)
-        self.avg_reward = -21
+            self.reward_list.append(torch.tensor(-21))
+        self.avg_reward = torch.tensor(-21)
 
     def populate(self, warm_start: int) -> None:
         """Populates the buffer with initial experience"""
@@ -150,20 +150,20 @@ class DQNLightning(pl.LightningModule):
         if self.global_step % self.hparams.sync_rate == 0:
             self.target_net.load_state_dict(self.net.state_dict())
 
-        log = {'total_reward': torch.tensor(self.total_reward).to(self.device),
-               'avg_reward': torch.tensor(self.avg_reward),
+        log = {'total_reward': self.total_reward,
+               'avg_reward': self.avg_reward,
                'train_loss': loss,
                'episode_steps': torch.tensor(self.total_episode_steps)
                }
         status = {'steps': torch.tensor(self.global_step).to(self.device),
-                  'avg_reward': torch.tensor(self.avg_reward),
-                  'total_reward': torch.tensor(self.total_reward).to(self.device),
+                  'avg_reward': self.avg_reward,
+                  'total_reward': self.total_reward,
                   'episodes': self.episode_count,
                   'episode_steps': self.episode_steps,
                   'epsilon': self.agent.epsilon
                   }
 
-        return OrderedDict({'loss': loss, 'avg_reward': torch.tensor(self.avg_reward),
+        return OrderedDict({'loss': loss, 'avg_reward': self.avg_reward,
                             'log': log, 'progress_bar': status})
 
     def test_step(self, *args, **kwargs) -> Dict[str, torch.Tensor]:
