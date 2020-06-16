@@ -1,8 +1,9 @@
 """Experience sources to be used as datasets for Ligthning DataLoaders"""
 from collections import deque
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 import numpy as np
+import torch
 from gym import Env
 from torch.utils.data import IterableDataset
 from algos.common.agents import Agent
@@ -60,21 +61,34 @@ class ExperienceSource:
         agent: Agent being used to make decisions
     """
 
-    def __init__(self, env: Env, agent: Agent, device):
-        self.env = env
+    def __init__(self, env: Union[Env, List[Env]], agent: Agent, device: torch.device):
+        assert isinstance(env, (Env, list))
+        assert isinstance(agent, Agent)
+        assert isinstance(device, torch.device)
+
+        self.env_pool = env if isinstance(env, list) else [env]
         self.agent = agent
-        self.state = self.env.reset()
+        self.states = []
+        self.env_reward = []
+        self.states = []
+        self.action_list = []
+        self._reset()
         self.device = device
 
     def _reset(self) -> None:
         """resets the env and state"""
-        self.state = self.env.reset()
+
+        for env in self.env_pool:
+            self.states.append(env.reset())
 
     def step(self) -> Tuple[Experience, float, bool]:
         """Takes a single step through the environment"""
-        action = self.agent(self.state, self.device)
-        new_state, reward, done, _ = self.env.step(action)
-        experience = Experience(state=self.state, action=action, reward=reward, new_state=new_state, done=done)
+        actions = self.agent(self.states, self.device)
+
+        for idx, a in enumerate(actions):
+            self.action_list.append(a.item())
+        new_state, reward, done, _ = self.env_pool[0].step(self.action_list[0])
+        experience = Experience(state=self.states[0], action=self.action_list[0], reward=reward, new_state=new_state, done=done)
         self.state = new_state
 
         if done:

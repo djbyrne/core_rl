@@ -1,5 +1,6 @@
 """Module containing basic type of agents used by the various algorithms"""
 from random import randint
+from typing import List
 
 import numpy as np
 import torch
@@ -39,22 +40,22 @@ class ValueAgent(Agent):
         self.eps_frames = eps_frames
 
     @torch.no_grad()
-    def __call__(self, state: torch.Tensor, device: str) -> int:
+    def __call__(self, states: List[torch.Tensor], device: str) -> int:
         """
         Takes in the current state and returns the action based on the agents policy
 
         Args:
-            state: current state of the environment
+            states: current state of the environment
             device: the device used for the current batch
 
         Returns:
             action defined by policy
         """
-
+        states = torch.tensor(states)
         if np.random.random() < self.epsilon:
             action = self.get_random_action()
         else:
-            action = self.get_action(state, device)
+            action = self.get_action(states, device)
 
         return action
 
@@ -64,7 +65,7 @@ class ValueAgent(Agent):
 
         return action
 
-    def get_action(self, state: torch.Tensor, device: torch.device):
+    def get_action(self, state: torch.Tensor, device: torch.device) -> List[torch.Tensor]:
         """
             Returns the best action based on the Q values of the network
             Args:
@@ -81,7 +82,7 @@ class ValueAgent(Agent):
 
         q_values = self.net(state)
         _, action = torch.max(q_values, dim=1)
-        return int(action.item())
+        return action
 
     def update_epsilon(self, step: int) -> None:
         """

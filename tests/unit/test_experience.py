@@ -6,9 +6,10 @@ import gym
 import torch
 from torch.utils.data import DataLoader
 
-from algos.common.agents import Agent
+from algos.common.agents import Agent, ValueAgent
 from algos.common.experience import EpisodicExperienceStream, RLDataset, ExperienceSource, NStepExperienceSource
 from algos.common.memory import Experience
+from algos.common.networks import MLP
 from algos.common.wrappers import ToTensor
 
 
@@ -52,7 +53,7 @@ class TestExperienceSource(TestCase):
         self.net = Mock()
         self.agent = DummyAgent(net=self.net)
         self.env = gym.make("CartPole-v0")
-        self.source = ExperienceSource(self.env, self.agent, Mock())
+        self.source = ExperienceSource(self.env, self.agent, torch.device('cpu'))
 
     def test_step(self):
         exp, reward, done = self.source.step()
@@ -61,6 +62,29 @@ class TestExperienceSource(TestCase):
     def test_episode(self):
         total_reward = self.source.run_episode()
         self.assertIsInstance(total_reward, float)
+
+    def test_multi_env(self):
+        """tests that the experience source is running multiple environments"""
+        self.assertIsInstance(self.source.env_pool, list)
+        envs = [self.env, self.env, self.env]
+
+        self.source = ExperienceSource(envs, self.agent, torch.device('cpu'))
+        self.assertIsInstance(self.source.env_pool, list)
+        self.assertEqual(len(self.source.env_pool), len(envs))
+        self.assertEqual(len(self.source.states), len(envs))
+
+    def test_multi_env_step(self):
+        """tests that the experience source is running multiple environments"""
+        envs = [self.env, self.env, self.env]
+        obs_shape = self.env.observation_space.shape
+        n_actions = self.env.action_space.n
+        net = MLP(obs_shape, n_actions-1)
+        agent = ValueAgent(net, n_actions)
+        self.source = ExperienceSource(envs, agent, torch.device('cpu'))
+        self.assertEqual(self.source.action_list, [])
+        self.source.agent.epsilon = 0.0
+        self.source.step()
+        self.assertEqual(self.source.action_list, [0] * len(envs))
 
 
 class TestNStepExperienceSource(TestCase):
