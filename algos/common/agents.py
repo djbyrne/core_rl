@@ -13,6 +13,7 @@ class Agent:
     def __init__(self, net: nn.Module):
         self.net = net
 
+    @torch.no_grad()
     def __call__(self, state: torch.Tensor, device: str) -> int:
         """
         Using the given network, decide what action to carry
@@ -37,6 +38,7 @@ class ValueAgent(Agent):
         self.eps_end = eps_end
         self.eps_frames = eps_frames
 
+    @torch.no_grad()
     def __call__(self, state: torch.Tensor, device: str) -> int:
         """
         Takes in the current state and returns the action based on the agents policy
@@ -94,6 +96,7 @@ class ValueAgent(Agent):
 class PolicyAgent(Agent):
     """Policy based agent that returns an action based on the networks policy"""
 
+    @torch.no_grad()
     def __call__(self, state: torch.Tensor, device: str) -> int:
         """
         Takes in the current state and returns the action based on the agents policy

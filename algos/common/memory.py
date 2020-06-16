@@ -6,7 +6,7 @@ from typing import Tuple, List, Union
 from collections import deque, namedtuple
 
 import numpy as np
-
+import torch
 
 Experience = namedtuple(
     'Experience', field_names=['state', 'action', 'reward',
@@ -26,6 +26,7 @@ class Buffer:
     def __len__(self) -> None:
         return len(self.buffer)
 
+    @torch.no_grad
     def append(self, experience: Experience) -> None:
         """
         Add experience to the buffer
@@ -115,6 +116,7 @@ class MultiStepBuffer:
 
         return reward, final_state, done
 
+    @torch.no_grad
     def append(self, experience) -> None:
         """
         add an experience to the buffer by collecting n steps of experiences
@@ -205,6 +207,7 @@ class PERBuffer(ReplayBuffer):
 
         return self.beta
 
+    @torch.no_grad
     def append(self, exp) -> None:
         """
         Adds experiences from exp_source to the PER buffer
