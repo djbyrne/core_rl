@@ -1,3 +1,4 @@
+from collections import deque
 from unittest import TestCase
 from unittest.mock import Mock
 
@@ -15,7 +16,7 @@ from algos.common.wrappers import ToTensor
 
 class DummyAgent(Agent):
     def __call__(self, states, agent_states):
-        return 0
+        return [0]
 
 
 class TestEpisodicExperience(TestCase):
@@ -25,7 +26,7 @@ class TestEpisodicExperience(TestCase):
         self.env = ToTensor(gym.make("CartPole-v0"))
         self.net = Mock()
         self.agent = Agent(self.net)
-        self.xp_stream = EpisodicExperienceStream(self.env, self.agent, device=Mock(), episodes=4)
+        self.xp_stream = EpisodicExperienceStream(self.env, self.agent, device=torch.device('cpu'), episodes=4)
         self.rl_dataloader = DataLoader(self.xp_stream)
 
     def test_experience_stream_SINGLE_EPISODE(self):
@@ -50,7 +51,10 @@ class TestEpisodicExperience(TestCase):
 class TestExperienceSource(TestCase):
 
     def setUp(self) -> None:
-        self.net = Mock()
+        self.env = ToTensor(gym.make("CartPole-v0"))
+        self.obs_shape = self.env.observation_space.shape
+        self.n_actions = self.env.action_space.n
+        self.net = MLP(self.obs_shape, self.n_actions - 1)
         self.agent = DummyAgent(net=self.net)
         self.env = gym.make("CartPole-v0")
         self.source = ExperienceSource(self.env, self.agent, torch.device('cpu'))
@@ -76,15 +80,14 @@ class TestExperienceSource(TestCase):
     def test_multi_env_step(self):
         """tests that the experience source is running multiple environments"""
         envs = [self.env, self.env, self.env]
-        obs_shape = self.env.observation_space.shape
-        n_actions = self.env.action_space.n
-        net = MLP(obs_shape, n_actions-1)
-        agent = ValueAgent(net, n_actions)
+        agent = ValueAgent(self.net, self.n_actions)
         self.source = ExperienceSource(envs, agent, torch.device('cpu'))
         self.assertEqual(self.source.action_list, [])
         self.source.agent.epsilon = 0.0
-        self.source.step()
-        self.assertEqual(self.source.action_list, [0] * len(envs))
+        exps, rewards, dones = self.source.step()
+        self.assertIsInstance(exps, list)
+        self.assertIsInstance(rewards, list)
+        self.assertIsInstance(dones, list)
 
 
 class TestNStepExperienceSource(TestCase):
@@ -93,8 +96,10 @@ class TestNStepExperienceSource(TestCase):
         self.net = Mock()
         self.agent = DummyAgent(net=self.net)
         self.env = gym.make("CartPole-v0")
+        self.env_pool = [gym.make("CartPole-v0"), gym.make("CartPole-v0")]
         self.n_step = 2
-        self.source = NStepExperienceSource(self.env, self.agent, Mock(), n_steps=self.n_step)
+        self.device = torch.device('cpu')
+        self.source = NStepExperienceSource(self.env_pool, self.agent, self.device, n_steps=self.n_step)
 
         self.state = np.zeros([32, 32])
         self.state_02 = np.ones([32, 32])
@@ -111,6 +116,11 @@ class TestNStepExperienceSource(TestCase):
         self.experience02 = Experience(self.state_02, self.action_02, self.reward_02, self.done_02, self.next_state_02)
         self.experience03 = Experience(self.state_02, self.action_02, self.reward_02, self.done_02, self.next_state_02)
 
+    def test_n_step_buffer(self):
+        """tests that the n_step_buffer was initialized correctly"""
+        self.assertEqual(len(self.source.n_step_buffer), len(self.source.env_pool))
+        self.assertIsInstance(self.source.n_step_buffer[0], deque)
+
     def test_step(self):
         self.assertEqual(len(self.source.n_step_buffer), 0)
         exp, reward, done = self.source.step()
@@ -118,7 +128,7 @@ class TestNStepExperienceSource(TestCase):
         self.assertEqual(len(self.source.n_step_buffer), self.n_step)
 
     def test_multi_step(self):
-        self.source.env.step = Mock(return_value=(self.next_state_02, self.reward_02, self.done_02, Mock()))
+        self.source.env_pool[0].step = Mock(return_value=(self.next_state_02, self.reward_02, self.done_02, Mock()))
         self.source.n_step_buffer.append(self.experience01)
         self.source.n_step_buffer.append(self.experience01)
 
@@ -128,24 +138,25 @@ class TestNStepExperienceSource(TestCase):
         self.assertEqual(next_state.all(), self.next_state_02.all())
 
     def test_discounted_transition(self):
-        self.source = NStepExperienceSource(self.env, self.agent, Mock(), n_steps=3)
+        self.source = NStepExperienceSource(self.env_pool, self.agent, self.device, n_steps=3)
 
-        self.source.n_step_buffer.append(self.experience01)
-        self.source.n_step_buffer.append(self.experience02)
-        self.source.n_step_buffer.append(self.experience03)
+        for i in range(len(self.env_pool)):
+            self.source.n_step_buffer[i].append(self.experience01)
+            self.source.n_step_buffer[i].append(self.experience02)
+            self.source.n_step_buffer[i].append(self.experience03)
 
-        reward, next_state, done = self.source.get_transition_info()
+            reward, next_state, done = self.source.get_transition_info(self.source.n_step_buffer[i])
 
-        reward_01 = self.experience02.reward + 0.9 * self.experience03.reward * (1 - done)
-        reward_gt = self.experience01.reward + 0.9 * reward_01 * (1 - done)
+            reward_01 = self.experience02.reward + 0.9 * self.experience03.reward * (1 - done)
+            reward_gt = self.experience01.reward + 0.9 * reward_01 * (1 - done)
 
-        self.assertEqual(reward, reward_gt)
-        self.assertEqual(next_state.all(), self.next_state_02.all())
-        self.assertEqual(self.experience03.done, done)
+            self.assertEqual(reward, reward_gt)
+            self.assertEqual(next_state.all(), self.next_state_02.all())
+            self.assertEqual(self.experience03.done, done)
 
     def test_multi_step_discount(self):
-        self.source = NStepExperienceSource(self.env, self.agent, Mock(), n_steps=3)
-        self.source.env.step = Mock(return_value=(self.next_state_02, self.reward_02, self.done_02, Mock()))
+        self.source = NStepExperienceSource(self.env_pool, self.agent, self.device, n_steps=3)
+        self.source.env_pool[0].step = Mock(return_value=(self.next_state_02, self.reward_02, self.done_02, Mock()))
 
         self.source.n_step_buffer.append(self.experience01)
         self.source.n_step_buffer.append(self.experience02)

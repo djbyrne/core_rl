@@ -81,20 +81,23 @@ class ExperienceSource:
         for env in self.env_pool:
             self.states.append(env.reset())
 
-    def step(self) -> Tuple[Experience, float, bool]:
-        """Takes a single step through the environment"""
-        actions = self.agent(self.states, self.device)
+    def step(self) -> Tuple[List[Experience], List[float], List[bool]]:
+        """Takes a single step through each environment in the pool"""
+        agent_actions = self.agent(self.states, self.device)
+        experiences, rewards, dones = [], [], []
 
-        for idx, a in enumerate(actions):
-            self.action_list.append(a.item())
-        new_state, reward, done, _ = self.env_pool[0].step(self.action_list[0])
-        experience = Experience(state=self.states[0], action=self.action_list[0], reward=reward, new_state=new_state, done=done)
-        self.state = new_state
+        for idx, action in enumerate(agent_actions):
+            new_state, reward, done, _ = self.env_pool[idx].step(action)
+            exp = Experience(state=self.states[0], action=action, reward=reward, new_state=new_state, done=done)
+            self.states[idx] = new_state
+            experiences.append(exp)
+            rewards.append(reward)
+            dones.append(done)
 
-        if done:
-            self.state = self.env.reset()
+            if done:
+                self.states[idx] = self.env_pool[idx].reset()
 
-        return experience, reward, done
+        return experiences, rewards, dones
 
     def run_episode(self) -> float:
         """Carries out a single episode and returns the total reward. This is used for testing"""
@@ -110,10 +113,11 @@ class ExperienceSource:
 
 class NStepExperienceSource(ExperienceSource):
     """Expands upon the basic ExperienceSource by collecting experience across N steps"""
-    def __init__(self, env: Env, agent: Agent, device, n_steps: int = 1):
-        super().__init__(env, agent, device)
+    def __init__(self, env_pool: List[Env], agent: Agent, device, n_steps: int = 1):
+        super().__init__(env_pool, agent, device)
         self.n_steps = n_steps
-        self.n_step_buffer = deque(maxlen=n_steps)
+        buffer = deque(maxlen=n_steps)
+        self.n_step_buffer = [buffer] * len(env_pool)
 
     def step(self) -> Tuple[Experience, float, bool]:
         """
@@ -124,16 +128,19 @@ class NStepExperienceSource(ExperienceSource):
         """
         exp = self.single_step()
 
-        while len(self.n_step_buffer) < self.n_steps:
-            self.single_step()
+        for idx in range(len(self.env_pool)):
+            buffer = self.n_step_buffer[idx]
 
-        reward, next_state, done = self.get_transition_info()
-        first_experience = self.n_step_buffer[0]
-        multi_step_experience = Experience(first_experience.state,
-                                           first_experience.action,
-                                           reward,
-                                           done,
-                                           next_state)
+            while len(buffer) < self.n_steps:
+                self.single_step()
+
+            reward, next_state, done = self.get_transition_info(buffer)
+            first_experience = buffer[0]
+            multi_step_experience = Experience(first_experience.state,
+                                               first_experience.action,
+                                               reward,
+                                               done,
+                                               next_state)
 
         return multi_step_experience, exp.reward, exp.done
 
@@ -144,11 +151,12 @@ class NStepExperienceSource(ExperienceSource):
         Returns:
             Experience
         """
-        exp, _, _ = super().step()
-        self.n_step_buffer.append(exp)
-        return exp
+        experiences, _, _ = super().step()
+        for idx, exp in enumerate(experiences):
+            self.n_step_buffer[idx].append(exp)
+        return experiences
 
-    def get_transition_info(self, gamma=0.9) -> Tuple[np.float, np.array, np.int]:
+    def get_transition_info(self, buffer: deque, gamma=0.9) -> Tuple[np.float, np.array, np.int]:
         """
         get the accumulated transition info for the n_step_buffer
         Args:
@@ -157,14 +165,14 @@ class NStepExperienceSource(ExperienceSource):
         Returns:
             multi step reward, final observation and done
         """
-        last_experience = self.n_step_buffer[-1]
+        last_experience = buffer[-1]
         final_state = last_experience.new_state
         done = last_experience.done
         reward = last_experience.reward
 
         # calculate reward
         # in reverse order, go through all the experiences up till the first experience
-        for experience in reversed(list(self.n_step_buffer)[:-1]):
+        for experience in reversed(list(buffer)[:-1]):
             reward_t = experience.reward
             new_state_t = experience.new_state
             done_t = experience.done
@@ -212,12 +220,12 @@ class EpisodicExperienceStream(ExperienceSource, IterableDataset):
 
     def step(self) -> Experience:
         """Carries out a single step in the environment"""
-        action = self.agent(self.state, self.device)
-        new_state, reward, done, _ = self.env.step(action)
-        experience = Experience(state=self.state, action=action, reward=reward, new_state=new_state, done=done)
+        action = self.agent(self.states, self.device)
+        new_state, reward, done, _ = self.env_pool[0].step(action)
+        experience = Experience(state=self.states, action=action, reward=reward, new_state=new_state, done=done)
         self.state = new_state
 
         if done:
-            self.state = self.env.reset()
+            self.state = self.env_pool[0].reset()
 
         return experience

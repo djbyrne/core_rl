@@ -8,6 +8,21 @@ from torch import nn
 import torch.nn.functional as F
 
 
+def default_states_preprocessor(states: List) -> List[torch.Tensor]:
+    """
+    Convert list of states into the form suitable for model. By default we assume Variable
+
+    Args:
+        list of numpy arrays with states
+    :return: Variable
+    """
+    if len(states) == 1:
+        np_states = np.expand_dims(states[0], 0)
+    else:
+        np_states = np.array([np.array(s, copy=False) for s in states], copy=False)
+    return torch.tensor(np_states)
+
+
 class Agent:
     """Basic agent that always returns 0"""
 
@@ -15,16 +30,17 @@ class Agent:
         self.net = net
 
     @torch.no_grad()
-    def __call__(self, state: torch.Tensor, device: str) -> int:
+    def __call__(self, states: List[torch.Tensor], device: str) -> List[int]:
         """
         Using the given network, decide what action to carry
 
         Args:
-            state: current state of the environment
+            states: current state of the environment
             device: device used for current batch
         Returns:
             action
         """
+        assert isinstance(states, list)
         return 0
 
 
@@ -40,7 +56,7 @@ class ValueAgent(Agent):
         self.eps_frames = eps_frames
 
     @torch.no_grad()
-    def __call__(self, states: List[torch.Tensor], device: str) -> int:
+    def __call__(self, states: List[torch.Tensor], device: str) -> List[int]:
         """
         Takes in the current state and returns the action based on the agents policy
 
@@ -51,19 +67,24 @@ class ValueAgent(Agent):
         Returns:
             action defined by policy
         """
-        states = torch.tensor(states)
+        assert isinstance(states, list)
+
+        torch_states = default_states_preprocessor(states)
+
         if np.random.random() < self.epsilon:
-            action = self.get_random_action()
+            action = self.get_random_action(torch_states)
         else:
-            action = self.get_action(states, device)
+            action = self.get_action(torch_states, device)
 
         return action
 
-    def get_random_action(self) -> int:
+    def get_random_action(self, states: List[torch.Tensor]) -> List[int]:
         """returns a random action"""
-        action = randint(0, self.action_space - 1)
+        actions = []
+        for _ in states:
+            actions.append(randint(0, self.action_space - 1))
 
-        return action
+        return actions
 
     def get_action(self, state: torch.Tensor, device: torch.device) -> List[torch.Tensor]:
         """
@@ -74,15 +95,16 @@ class ValueAgent(Agent):
             Returns:
                 action defined by Q values
         """
-        if not isinstance(state, torch.Tensor):
-            state = torch.tensor([state])
+        # if not isinstance(state, torch.Tensor):
+        #     state = torch.tensor(state)
 
         if device.type != 'cpu':
             state = state.cuda(device)
 
         q_values = self.net(state)
-        _, action = torch.max(q_values, dim=1)
-        return action
+        _, actions = torch.max(q_values, dim=1)
+        actions = [action.item() for action in actions]
+        return actions
 
     def update_epsilon(self, step: int) -> None:
         """
@@ -98,7 +120,7 @@ class PolicyAgent(Agent):
     """Policy based agent that returns an action based on the networks policy"""
 
     @torch.no_grad()
-    def __call__(self, state: torch.Tensor, device: str) -> int:
+    def __call__(self, state: torch.Tensor, device: str) -> List[int]:
         """
         Takes in the current state and returns the action based on the agents policy
 
