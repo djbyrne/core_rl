@@ -15,8 +15,12 @@ from algos.common.wrappers import ToTensor
 
 
 class DummyAgent(Agent):
+    def __init__(self, num_envs, net):
+        super().__init__(net)
+        self.num_envs = num_envs
+
     def __call__(self, states, agent_states):
-        return [0]
+        return [0] * self.num_envs
 
 
 class TestEpisodicExperience(TestCase):
@@ -55,7 +59,7 @@ class TestExperienceSource(TestCase):
         self.obs_shape = self.env.observation_space.shape
         self.n_actions = self.env.action_space.n
         self.net = MLP(self.obs_shape, self.n_actions - 1)
-        self.agent = DummyAgent(net=self.net)
+        self.agent = DummyAgent(1, net=self.net)
         self.env = gym.make("CartPole-v0")
         self.source = ExperienceSource(self.env, self.agent, torch.device('cpu'))
 
@@ -104,7 +108,7 @@ class TestNStepExperienceSource(TestCase):
 
     def setUp(self) -> None:
         self.net = Mock()
-        self.agent = DummyAgent(net=self.net)
+        self.agent = DummyAgent(2, net=self.net)
         self.env = gym.make("CartPole-v0")
         self.env_pool = [gym.make("CartPole-v0"), gym.make("CartPole-v0")]
         self.n_step = 2
@@ -132,19 +136,21 @@ class TestNStepExperienceSource(TestCase):
         self.assertIsInstance(self.source.n_step_buffer[0], deque)
 
     def test_step(self):
-        self.assertEqual(len(self.source.n_step_buffer), 0)
+        self.assertEqual(len(self.source.n_step_buffer), len(self.env_pool))
+        self.assertEqual(len(self.source.n_step_buffer[0]), 0)
         exp, reward, done = self.source.step()
-        self.assertEqual(len(exp), 5)
-        self.assertEqual(len(self.source.n_step_buffer), self.n_step)
+        self.assertEqual(len(exp), len(self.env_pool))
+        self.assertEqual(len(exp[0]), 5)
+        self.assertEqual(len(self.source.n_step_buffer[0]), self.n_step)
 
     def test_multi_step(self):
         self.source.env_pool[0].step = Mock(return_value=(self.next_state_02, self.reward_02, self.done_02, Mock()))
         self.source.n_step_buffer.append(self.experience01)
         self.source.n_step_buffer.append(self.experience01)
 
-        exp, reward, done = self.source.step()
+        exps, rewards, dones = self.source.step()
 
-        next_state = exp[4]
+        next_state = exps[0][4]
         self.assertEqual(next_state.all(), self.next_state_02.all())
 
     def test_discounted_transition(self):
@@ -165,21 +171,26 @@ class TestNStepExperienceSource(TestCase):
             self.assertEqual(self.experience03.done, done)
 
     def test_multi_step_discount(self):
-        self.source = NStepExperienceSource(self.env_pool, self.agent, self.device, n_steps=3)
+        self.source.env_pool[0].reset = Mock(return_value=self.next_state)
+        self.source.env_pool[1].reset = Mock(return_value=self.next_state)
         self.source.env_pool[0].step = Mock(return_value=(self.next_state_02, self.reward_02, self.done_02, Mock()))
+        self.source.env_pool[1].step = Mock(return_value=(self.next_state_02, self.reward_02, self.done_02, Mock()))
+        self.source = NStepExperienceSource(self.env_pool, self.agent, self.device, n_steps=3)
 
-        self.source.n_step_buffer.append(self.experience01)
-        self.source.n_step_buffer.append(self.experience02)
+        for buffer in self.source.n_step_buffer:
+            buffer.append(self.experience01)
+            buffer.append(self.experience02)
 
         reward_gt = 1.71
 
-        exp, reward, done = self.source.step()
+        exps, rewards, dones = self.source.step()
 
-        self.assertEqual(exp[0].all(), self.experience01.state.all())
-        self.assertEqual(exp[1], self.experience01.action)
-        self.assertEqual(exp[2], reward_gt)
-        self.assertEqual(exp[3], self.experience02.done)
-        self.assertEqual(exp[4].all(), self.experience02.new_state.all())
+        exp_sample = exps[0]
+        self.assertEqual(exp_sample[0].all(), self.experience01.state.all())
+        self.assertEqual(exp_sample[1], self.experience01.action)
+        self.assertEqual(exp_sample[2], reward_gt)
+        self.assertEqual(exp_sample[3], self.experience02.done)
+        self.assertEqual(exp_sample[4].all(), self.experience02.new_state.all())
 
 
 class TestRLDataset(TestCase):

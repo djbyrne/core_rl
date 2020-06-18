@@ -125,17 +125,17 @@ class NStepExperienceSource(ExperienceSource):
     def __init__(self, env_pool: List[Env], agent: Agent, device, n_steps: int = 1):
         super().__init__(env_pool, agent, device)
         self.n_steps = n_steps
-        buffer = deque(maxlen=n_steps)
-        self.n_step_buffer = [buffer] * len(env_pool)
+        self.n_step_buffer = [deque(maxlen=n_steps) for _ in range(len(env_pool))]
 
-    def step(self) -> Tuple[Experience, float, bool]:
+    def step(self) -> Tuple[List[Experience], List[float], List[bool]]:
         """
         Takes an n-step in the environment
 
         Returns:
             Experience
         """
-        exp = self.single_step()
+        self.single_step()
+        mulit_experiences, rewards, dones = [], [], []
 
         for idx in range(len(self.env_pool)):
             buffer = self.n_step_buffer[idx]
@@ -151,9 +151,13 @@ class NStepExperienceSource(ExperienceSource):
                                                done,
                                                next_state)
 
-        return multi_step_experience, exp.reward, exp.done
+            mulit_experiences.append(multi_step_experience)
+            rewards.append(reward)
+            dones.append(done)
 
-    def single_step(self) -> Experience:
+        return mulit_experiences, rewards, dones
+
+    def single_step(self) -> List[Experience]:
         """
         Takes a  single step in the environment and appends it to the n-step buffer
 
