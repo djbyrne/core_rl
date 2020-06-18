@@ -125,7 +125,7 @@ class NStepExperienceSource(ExperienceSource):
     def __init__(self, env_pool: List[Env], agent: Agent, device, n_steps: int = 1):
         super().__init__(env_pool, agent, device)
         self.n_steps = n_steps
-        self.n_step_buffer = [deque(maxlen=n_steps) for _ in range(len(env_pool))]
+        self.n_step_buffer = [deque(maxlen=n_steps) for _ in range(len(self.env_pool))]
 
     def step(self) -> Tuple[List[Experience], List[float], List[bool]]:
         """

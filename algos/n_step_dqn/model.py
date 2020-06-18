@@ -44,12 +44,3 @@ class NStepDQNLightning(DQNLightning):
         self.source = NStepExperienceSource(self.env, self.agent, device, n_steps=self.hparams.n_steps)
         self.buffer = ReplayBuffer(self.hparams.replay_size)
 
-        self.total_reward = 0
-        self.episode_reward = 0
-        self.episode_count = 0
-        self.episode_steps = 0
-        self.total_episode_steps = 0
-        self.reward_list = []
-        for _ in range(100):
-            self.reward_list.append(-21)
-        self.avg_reward = 0

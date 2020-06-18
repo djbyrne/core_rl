@@ -152,7 +152,7 @@ class DQNLightning(pl.LightningModule):
                 self.episode_steps[idx] = 0
 
         # Soft update of target network
-        if (self.global_step * len(self.env)) % self.hparams.sync_rate == 0:
+        if (self.global_step * len(self.source.env_pool)) % self.hparams.sync_rate == 0:
             self.target_net.load_state_dict(self.net.state_dict())
 
         log = {'total_reward': self.total_reward,
