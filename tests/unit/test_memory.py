@@ -76,6 +76,18 @@ class TestReplayBuffer(TestCase):
 
         self.assertEqual(len(self.buffer), self.warm_start + 1)
 
+    def test_replay_buffer_APPEND_LIST(self):
+        """Test that you can append to the replay buffer"""
+
+        self.assertEqual(len(self.buffer), self.warm_start)
+
+        self.buffer.append([self.experience])
+
+        self.assertEqual(len(self.buffer), self.warm_start + 1)
+        sample = self.buffer.buffer[-1]
+
+        self.assertEqual(sample, self.experience)
+
     def test_replay_buffer_POPULATE(self):
         """Tests that the buffer is populated correctly with warm_start"""
         self.assertEqual(len(self.buffer.buffer), self.warm_start)
@@ -212,9 +224,9 @@ class TestMultiStepReplayBuffer(TestCase):
         self.assertEqual(len(self.buffer), 0)
         self.assertEqual(len(self.buffer.n_step_buffer), 1)
 
-    def test_append_single_experience(self):
+    def test_append_multi_experience(self):
         """
-        If a single experience is added and the number of experiences collected >= n, the multi step experience should
+        If multiples experience is added sequentially and the number of experiences collected >= n, the multi step experience should
         be added to the full buffer.
         """
         self.assertEqual(len(self.buffer), 0)

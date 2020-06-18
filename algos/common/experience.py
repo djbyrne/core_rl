@@ -99,16 +99,25 @@ class ExperienceSource:
 
         return experiences, rewards, dones
 
-    def run_episode(self) -> float:
-        """Carries out a single episode and returns the total reward. This is used for testing"""
+    def run_episode(self) -> List[float]:
+        """
+        Carries out a single episode and returns the total reward. This is used for testing
+
+        Returns:
+            List of total rewards for the number of environments run
+        """
         done = False
-        total_reward = 0
+        total_rewards = []
 
         while not done:
             _, reward, done = self.step()
-            total_reward += reward
+            for idx, rew in enumerate(reward):
+                if len(total_rewards) < len(reward):
+                    total_rewards.append(rew)
+                else:
+                    total_rewards[idx] += reward[idx]
 
-        return total_reward
+        return total_rewards
 
 
 class NStepExperienceSource(ExperienceSource):

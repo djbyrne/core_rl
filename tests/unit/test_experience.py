@@ -60,12 +60,22 @@ class TestExperienceSource(TestCase):
         self.source = ExperienceSource(self.env, self.agent, torch.device('cpu'))
 
     def test_step(self):
+        """Test that outputs from source.step() provide a list of experiecnes, reward and done for each environment"""
         exp, reward, done = self.source.step()
-        self.assertEqual(len(exp), 5)
+        self.assertIsInstance(exp, list)
+        self.assertIsInstance(reward, list)
+        self.assertIsInstance(done, list)
+        self.assertEqual(len(exp[0]), 5)
+        self.assertEqual(len(reward), 1)
+        self.assertEqual(len(done), 1)
+        self.assertIsInstance(exp[0], Experience)
+        self.assertIsInstance(reward[0], float)
+        self.assertIsInstance(done[0], bool)
 
     def test_episode(self):
+        """Test that run episode outputs the total reward for each episode"""
         total_reward = self.source.run_episode()
-        self.assertIsInstance(total_reward, float)
+        self.assertIsInstance(total_reward[0], float)
 
     def test_multi_env(self):
         """tests that the experience source is running multiple environments"""

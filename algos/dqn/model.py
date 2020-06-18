@@ -14,6 +14,8 @@ tensorboard --logdir default
 from typing import Tuple, List, Dict
 import argparse
 from collections import OrderedDict
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -36,11 +38,12 @@ class DQNLightning(pl.LightningModule):
 
         device = torch.device("cuda:0" if self.hparams.gpus > 0 else "cpu")
 
-        self.env = wrappers.make_env(self.hparams.env)
-        self.env.seed(123)
+        env = wrappers.make_env(self.hparams.env)
+        env.seed(123)
+        self.env = [env]
 
-        self.obs_shape = self.env.observation_space.shape
-        self.n_actions = self.env.action_space.n
+        self.obs_shape = env.observation_space.shape
+        self.n_actions = env.action_space.n
 
         self.net = None
         self.target_net = None
@@ -51,11 +54,11 @@ class DQNLightning(pl.LightningModule):
                                 eps_end=hparams.eps_end, eps_frames=hparams.eps_last_frame)
         self.source = ExperienceSource(self.env, self.agent, device)
 
-        self.total_reward = 0
-        self.episode_reward = 0
-        self.episode_count = 0
-        self.episode_steps = 0
-        self.total_episode_steps = 0
+        self.total_reward = np.zeros(len(self.env))
+        self.episode_reward = np.zeros(len(self.env))
+        self.episode_count = np.zeros(len(self.env))
+        self.episode_steps = np.zeros(len(self.env))
+        self.total_episode_steps = np.zeros(len(self.env))
         self.reward_list = []
         for _ in range(100):
             self.reward_list.append(torch.tensor(-21))
@@ -128,26 +131,28 @@ class DQNLightning(pl.LightningModule):
         exp, reward, done = self.source.step()
         self.buffer.append(exp)
 
-        self.episode_reward += reward
-        self.episode_steps += 1
-
         # calculates training loss
         loss = self.loss(batch)
 
         if self.trainer.use_dp or self.trainer.use_ddp2:
             loss = loss.unsqueeze(0)
 
-        if done:
-            self.total_reward = self.episode_reward
-            self.reward_list.append(self.total_reward)
-            self.avg_reward = sum(self.reward_list[-100:]) / 100
-            self.episode_count += 1
-            self.episode_reward = 0
-            self.total_episode_steps = self.episode_steps
-            self.episode_steps = 0
+        # Handle rewards and dones for each environment run
+        for idx, rew in enumerate(reward):
+            self.episode_reward[idx] += reward[idx]
+            self.episode_steps[idx] += 1
+
+            if done[idx]:
+                self.total_reward = self.episode_reward[idx]
+                self.reward_list.append(self.episode_reward[idx])
+                self.avg_reward = sum(self.reward_list[-100:]) / 100
+                self.episode_count += 1
+                self.episode_reward[idx] = 0
+                self.total_episode_steps = self.episode_steps[idx]
+                self.episode_steps[idx] = 0
 
         # Soft update of target network
-        if self.global_step % self.hparams.sync_rate == 0:
+        if (self.global_step * len(self.env)) % self.hparams.sync_rate == 0:
             self.target_net.load_state_dict(self.net.state_dict())
 
         log = {'total_reward': self.total_reward,

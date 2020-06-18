@@ -34,7 +34,11 @@ class Buffer:
         Args:
             experience: tuple (state, action, reward, done, new_state)
         """
-        self.buffer.append(experience)
+        if isinstance(experience, list):
+            for exp in experience:
+                self.buffer.append(exp)
+        else:
+            self.buffer.append(experience)
 
     # pylint: disable=unused-argument
     def sample(self, *args) -> Union[Tuple, List[Tuple]]:
