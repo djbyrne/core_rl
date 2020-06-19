@@ -127,6 +127,7 @@ class MultiStepBuffer:
         Args:
             experience: tuple (state, action, reward, done, next_state)
         """
+
         self.n_step_buffer.append(experience)
 
         if len(self.n_step_buffer) >= self.n_step:
@@ -212,26 +213,43 @@ class PERBuffer(ReplayBuffer):
         return self.beta
 
     @torch.no_grad()
-    def append(self, exp) -> None:
+    def append(self, experience: Experience) -> None:
         """
         Adds experiences from exp_source to the PER buffer
 
         Args:
-            exp: experience tuple being added to the buffer
+            experience: experience tuple being added to the buffer
         """
-        # what is the max priority for new sample
-        max_prio = self.priorities.max() if self.buffer else 1.0
 
-        if len(self.buffer) < self.capacity:
-            self.buffer.append(exp)
+        if isinstance(experience, list):
+            for exp in experience:
+                # what is the max priority for new sample
+                max_prio = self.priorities.max() if self.buffer else 1.0
+
+                if len(self.buffer) < self.capacity:
+                    self.buffer.append(exp)
+                else:
+                    self.buffer[self.pos] = exp
+
+                # the priority for the latest sample is set to max priority so it will be resampled soon
+                self.priorities[self.pos] = max_prio
+
+                # update position, loop back if it reaches the end
+                self.pos = (self.pos + 1) % self.capacity
         else:
-            self.buffer[self.pos] = exp
+            # what is the max priority for new sample
+            max_prio = self.priorities.max() if self.buffer else 1.0
 
-        # the priority for the latest sample is set to max priority so it will be resampled soon
-        self.priorities[self.pos] = max_prio
+            if len(self.buffer) < self.capacity:
+                self.buffer.append(experience)
+            else:
+                self.buffer[self.pos] = experience
 
-        # update position, loop back if it reaches the end
-        self.pos = (self.pos + 1) % self.capacity
+            # the priority for the latest sample is set to max priority so it will be resampled soon
+            self.priorities[self.pos] = max_prio
+
+            # update position, loop back if it reaches the end
+            self.pos = (self.pos + 1) % self.capacity
 
     def sample(self, batch_size=32) -> Tuple:
         """
