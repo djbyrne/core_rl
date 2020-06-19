@@ -27,18 +27,27 @@ class Buffer:
         return len(self.buffer)
 
     @torch.no_grad()
-    def append(self, experience: Experience) -> None:
+    def append(self, experience: Union[Experience, List[Experience]]) -> None:
         """
         Add experience to the buffer
 
         Args:
-            experience: tuple (state, action, reward, done, new_state)
+            experience: [tuple (state, action, reward, done, new_state)]
         """
         if isinstance(experience, list):
             for exp in experience:
-                self.buffer.append(exp)
+                self.append_sample(exp)
         else:
-            self.buffer.append(experience)
+            self.append_sample(experience)
+
+    def append_sample(self, experience: Experience) -> None:
+        """
+        Adds a single experience to the buffer
+
+        Args:
+            experience: tuple (state, action, reward, done, new_state)
+        """
+        self.buffer.append(experience)
 
     # pylint: disable=unused-argument
     def sample(self, *args) -> Union[Tuple, List[Tuple]]:
@@ -81,15 +90,15 @@ class ReplayBuffer(Buffer):
                 np.array(dones, dtype=np.bool), np.array(next_states))
 
 
-class MultiStepBuffer:
+class MultiStepBuffer(Buffer):
     """
     N Step Replay Buffer
 
     Deprecated: use the NStepExperienceSource with the standard ReplayBuffer
     """
     def __init__(self, buffer_size, n_step=2):
+        super().__init__(capacity=buffer_size)
         self.n_step = n_step
-        self.buffer = deque(maxlen=buffer_size)
         self.n_step_buffer = deque(maxlen=n_step)
 
     def __len__(self):
@@ -121,7 +130,7 @@ class MultiStepBuffer:
         return reward, final_state, done
 
     @torch.no_grad()
-    def append(self, experience) -> None:
+    def append_sample(self, experience: Experience) -> None:
         """
         add an experience to the buffer by collecting n steps of experiences
         Args:
@@ -213,7 +222,7 @@ class PERBuffer(ReplayBuffer):
         return self.beta
 
     @torch.no_grad()
-    def append(self, experience: Experience) -> None:
+    def append_sample(self, experience: Experience) -> None:
         """
         Adds experiences from exp_source to the PER buffer
 
@@ -221,35 +230,20 @@ class PERBuffer(ReplayBuffer):
             experience: experience tuple being added to the buffer
         """
 
-        if isinstance(experience, list):
-            for exp in experience:
-                # what is the max priority for new sample
-                max_prio = self.priorities.max() if self.buffer else 1.0
 
-                if len(self.buffer) < self.capacity:
-                    self.buffer.append(exp)
-                else:
-                    self.buffer[self.pos] = exp
+        # what is the max priority for new sample
+        max_prio = self.priorities.max() if self.buffer else 1.0
 
-                # the priority for the latest sample is set to max priority so it will be resampled soon
-                self.priorities[self.pos] = max_prio
-
-                # update position, loop back if it reaches the end
-                self.pos = (self.pos + 1) % self.capacity
+        if len(self.buffer) < self.capacity:
+            self.buffer.append(experience)
         else:
-            # what is the max priority for new sample
-            max_prio = self.priorities.max() if self.buffer else 1.0
+            self.buffer[self.pos] = experience
 
-            if len(self.buffer) < self.capacity:
-                self.buffer.append(experience)
-            else:
-                self.buffer[self.pos] = experience
+        # the priority for the latest sample is set to max priority so it will be resampled soon
+        self.priorities[self.pos] = max_prio
 
-            # the priority for the latest sample is set to max priority so it will be resampled soon
-            self.priorities[self.pos] = max_prio
-
-            # update position, loop back if it reaches the end
-            self.pos = (self.pos + 1) % self.capacity
+        # update position, loop back if it reaches the end
+        self.pos = (self.pos + 1) % self.capacity
 
     def sample(self, batch_size=32) -> Tuple:
         """

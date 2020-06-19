@@ -21,7 +21,7 @@ class TestBuffer(TestCase):
         self.source = Mock()
         self.source.step = Mock(return_value=(self.experience, torch.tensor(0), False))
         self.batch_size = 8
-        self.buffer = Buffer(8)
+        self.buffer = Buffer(16)
 
         for _ in range(self.batch_size):
             self.buffer.append(self.experience)
@@ -48,6 +48,19 @@ class TestBuffer(TestCase):
             self.assertEqual(sample_batched[2].shape, torch.Size([self.batch_size, 1]))
             self.assertEqual(sample_batched[3].shape, torch.Size([self.batch_size, 1]))
             self.assertEqual(sample_batched[4].shape, torch.Size([self.batch_size, 4, 84, 84]))
+
+    def test_append_SINGLE_EXP(self):
+        """Test that when given a single Experience it is appended correctly"""
+        self.assertEqual(len(self.buffer), self.batch_size)
+        self.buffer.append(self.experience)
+        self.assertEqual(len(self.buffer), self.batch_size + 1)
+
+    def test_append_MULTI_EXP(self):
+        """Test that when given a single Experience it is appended correctly"""
+        self.assertEqual(len(self.buffer), self.batch_size)
+        exp_list = [self.experience, self.experience, self.experience]
+        self.buffer.append(exp_list)
+        self.assertEqual(len(self.buffer), self.batch_size + len(exp_list))
 
 
 class TestReplayBuffer(TestCase):
@@ -81,9 +94,9 @@ class TestReplayBuffer(TestCase):
 
         self.assertEqual(len(self.buffer), self.warm_start)
 
-        self.buffer.append([self.experience])
+        self.buffer.append([self.experience, self.experience])
 
-        self.assertEqual(len(self.buffer), self.warm_start + 1)
+        self.assertEqual(len(self.buffer), self.warm_start + 2)
         sample = self.buffer.buffer[-1]
 
         self.assertEqual(sample, self.experience)
@@ -149,6 +162,19 @@ class TestPrioReplayBuffer(TestCase):
 
         self.assertEqual(len(self.buffer), 1)
         self.assertEqual(self.buffer.priorities[0], 1.0)
+
+    def test_replay_buffer_APPEND_LIST(self):
+        """
+        Test that you can append a list of experiences to
+        the replay buffer and the latest experience has max priority
+        """
+        self.assertEqual(len(self.buffer), 0)
+        exp_list = [self.experience, self.experience]
+        self.buffer.append(exp_list)
+
+        self.assertEqual(len(self.buffer), 2)
+        self.assertEqual(self.buffer.priorities[0], 1.0)
+        self.assertEqual(self.buffer.priorities[1], 1.0)
 
     def test_replay_buffer_SAMPLE(self):
         """Test that you can sample from the buffer and the outputs are the correct shape"""
