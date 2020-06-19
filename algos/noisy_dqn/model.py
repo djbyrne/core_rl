@@ -56,31 +56,36 @@ class NoisyDQNLightning(DQNLightning):
         if self.trainer.use_dp or self.trainer.use_ddp2:
             loss = loss.unsqueeze(0)
 
-        if done:
-            self.total_reward = self.episode_reward
-            self.reward_list.append(self.total_reward)
-            self.avg_reward = sum(self.reward_list[-100:]) / 100
-            self.episode_count += 1
-            self.episode_reward = 0
-            self.total_episode_steps = self.episode_steps
-            self.episode_steps = 0
+        # Handle rewards and dones for each environment run
+        for idx, rew in enumerate(reward):
+            self.episode_reward[idx] += reward[idx]
+            self.episode_steps[idx] += 1
+
+            if done[idx]:
+                self.total_reward = self.episode_reward[idx]
+                self.reward_list.append(self.episode_reward[idx])
+                self.avg_reward = sum(self.reward_list[-100:]) / 100
+                self.episode_count += 1
+                self.episode_reward[idx] = 0
+                self.total_episode_steps = self.episode_steps[idx]
+                self.episode_steps[idx] = 0
 
         # Soft update of target network
-        if self.global_step % self.hparams.sync_rate == 0:
+        if (self.global_step * len(self.source.env_pool)) % self.hparams.sync_rate == 0:
             self.target_net.load_state_dict(self.net.state_dict())
 
-        log = {'total_reward': torch.tensor(self.total_reward).to(self.device),
-               'avg_reward': torch.tensor(self.avg_reward),
+        log = {'total_reward': self.total_reward,
+               'avg_reward': self.avg_reward,
                'train_loss': loss,
                'episode_steps': torch.tensor(self.total_episode_steps)
                }
         status = {'steps': torch.tensor(self.global_step).to(self.device),
-                  'avg_reward': torch.tensor(self.avg_reward),
-                  'total_reward': torch.tensor(self.total_reward).to(self.device),
+                  'avg_reward': self.avg_reward,
+                  'total_reward': self.total_reward,
                   'episodes': self.episode_count,
                   'episode_steps': self.episode_steps,
                   'epsilon': self.agent.epsilon
                   }
 
-        return OrderedDict({'loss': loss, 'avg_reward': torch.tensor(self.avg_reward),
+        return OrderedDict({'loss': loss, 'avg_reward': self.avg_reward,
                             'log': log, 'progress_bar': status})
