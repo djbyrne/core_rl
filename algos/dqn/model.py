@@ -38,12 +38,10 @@ class DQNLightning(pl.LightningModule):
 
         device = torch.device("cuda:0" if self.hparams.gpus > 0 else "cpu")
 
-        env = wrappers.make_env(self.hparams.env)
-        env.seed(123)
-        self.env = [env]
+        self.env = [self.make_env()]
 
-        self.obs_shape = env.observation_space.shape
-        self.n_actions = env.action_space.n
+        self.obs_shape = self.env[0].observation_space.shape
+        self.n_actions = self.env[0].action_space.n
 
         self.net = None
         self.target_net = None
@@ -63,6 +61,11 @@ class DQNLightning(pl.LightningModule):
         for _ in range(100):
             self.reward_list.append(torch.tensor(-21))
         self.avg_reward = torch.tensor(-21)
+
+    def make_env(self):
+        env = wrappers.make_env(self.hparams.env)
+        env.seed(123)
+        return env
 
     def populate(self, warm_start: int) -> None:
         """Populates the buffer with initial experience"""
@@ -137,7 +140,49 @@ class DQNLightning(pl.LightningModule):
         if self.trainer.use_dp or self.trainer.use_ddp2:
             loss = loss.unsqueeze(0)
 
-        # Handle rewards and dones for each environment run
+        self.process_outputs(done, reward)
+
+        self.targtet_update()
+
+        log = self.get_step_log(loss)
+        status = self.get_step_status()
+
+        return OrderedDict({'loss': loss, 'avg_reward': self.avg_reward,
+                            'log': log, 'progress_bar': status})
+
+    def get_step_status(self) -> None:
+        """Logic for defining the status update for each step"""
+        status = {'steps': torch.tensor(self.global_step).to(self.device),
+                  'avg_reward': self.avg_reward,
+                  'total_reward': self.total_reward,
+                  'episodes': self.episode_count,
+                  'episode_steps': self.episode_steps,
+                  'epsilon': self.agent.epsilon
+                  }
+        return status
+
+    def get_step_log(self, loss) -> None:
+        """Logic for defining the log update for each step"""
+        log = {'total_reward': self.total_reward,
+               'avg_reward': self.avg_reward,
+               'train_loss': loss,
+               'episode_steps': torch.tensor(self.total_episode_steps)
+               }
+        return log
+
+    def targtet_update(self) -> None:
+        """Update the weights of the target network"""
+        if (self.global_step * len(self.source.env_pool)) % self.hparams.sync_rate == 0:
+            self.target_net.load_state_dict(self.net.state_dict())
+
+    def process_outputs(self, done: List[bool], reward: List[float]) -> None:
+        """"
+        Handle rewards and dones for each environment run
+
+        Args:
+            reward: list of rewards from last step of each env
+            done: list of dones from last step of each env
+        """
         for idx, rew in enumerate(reward):
             self.episode_reward[idx] += reward[idx]
             self.episode_steps[idx] += 1
@@ -150,26 +195,6 @@ class DQNLightning(pl.LightningModule):
                 self.episode_reward[idx] = 0
                 self.total_episode_steps = self.episode_steps[idx]
                 self.episode_steps[idx] = 0
-
-        # Soft update of target network
-        if (self.global_step * len(self.source.env_pool)) % self.hparams.sync_rate == 0:
-            self.target_net.load_state_dict(self.net.state_dict())
-
-        log = {'total_reward': self.total_reward,
-               'avg_reward': self.avg_reward,
-               'train_loss': loss,
-               'episode_steps': torch.tensor(self.total_episode_steps)
-               }
-        status = {'steps': torch.tensor(self.global_step).to(self.device),
-                  'avg_reward': self.avg_reward,
-                  'total_reward': self.total_reward,
-                  'episodes': self.episode_count,
-                  'episode_steps': self.episode_steps,
-                  'epsilon': self.agent.epsilon
-                  }
-
-        return OrderedDict({'loss': loss, 'avg_reward': self.avg_reward,
-                            'log': log, 'progress_bar': status})
 
     def test_step(self, *args, **kwargs) -> Dict[str, torch.Tensor]:
         """Evaluate the agent for 10 episodes"""
