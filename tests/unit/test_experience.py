@@ -14,17 +14,17 @@ from algos.common.wrappers import ToTensor
 
 class DummyAgent(Agent):
     def __call__(self, states, agent_states):
-        return 0
+        return [0]
 
 
 class TestEpisodicExperience(TestCase):
     """Test the standard experience stream"""
 
     def setUp(self) -> None:
-        self.env = ToTensor(gym.make("CartPole-v0"))
+        self.env = [ToTensor(gym.make("CartPole-v0"))]
         self.net = Mock()
         self.agent = Agent(self.net)
-        self.xp_stream = EpisodicExperienceStream(self.env, self.agent, device=Mock(), episodes=4)
+        self.xp_stream = EpisodicExperienceStream(self.env, self.agent, device=torch.device('cpu'), episodes=4)
         self.rl_dataloader = DataLoader(self.xp_stream)
 
     def test_experience_stream_SINGLE_EPISODE(self):
@@ -51,8 +51,8 @@ class TestExperienceSource(TestCase):
     def setUp(self) -> None:
         self.net = Mock()
         self.agent = DummyAgent(net=self.net)
-        self.env = gym.make("CartPole-v0")
-        self.source = ExperienceSource(self.env, self.agent, Mock())
+        self.env = [gym.make("CartPole-v0")]
+        self.source = ExperienceSource(self.env, self.agent, torch.device('cpu'))
 
     def test_step(self):
         exp, reward, done = self.source.step()
@@ -70,7 +70,7 @@ class TestNStepExperienceSource(TestCase):
         self.agent = DummyAgent(net=self.net)
         self.env = gym.make("CartPole-v0")
         self.n_step = 2
-        self.source = NStepExperienceSource(self.env, self.agent, Mock(), n_steps=self.n_step)
+        self.source = NStepExperienceSource(self.env, self.agent, torch.device('cpu'), n_steps=self.n_step)
 
         self.state = np.zeros([32, 32])
         self.state_02 = np.ones([32, 32])
@@ -94,7 +94,7 @@ class TestNStepExperienceSource(TestCase):
         self.assertEqual(len(self.source.n_step_buffer), self.n_step)
 
     def test_multi_step(self):
-        self.source.env.step = Mock(return_value=(self.next_state_02, self.reward_02, self.done_02, Mock()))
+        self.source.env_pool[0].step = Mock(return_value=(self.next_state_02, self.reward_02, self.done_02, Mock()))
         self.source.n_step_buffer.append(self.experience01)
         self.source.n_step_buffer.append(self.experience01)
 
@@ -104,7 +104,7 @@ class TestNStepExperienceSource(TestCase):
         self.assertEqual(next_state.all(), self.next_state_02.all())
 
     def test_discounted_transition(self):
-        self.source = NStepExperienceSource(self.env, self.agent, Mock(), n_steps=3)
+        self.source = NStepExperienceSource(self.env, self.agent, torch.device('cpu'), n_steps=3)
 
         self.source.n_step_buffer.append(self.experience01)
         self.source.n_step_buffer.append(self.experience02)
@@ -120,8 +120,8 @@ class TestNStepExperienceSource(TestCase):
         self.assertEqual(self.experience03.done, done)
 
     def test_multi_step_discount(self):
-        self.source = NStepExperienceSource(self.env, self.agent, Mock(), n_steps=3)
-        self.source.env.step = Mock(return_value=(self.next_state_02, self.reward_02, self.done_02, Mock()))
+        self.source = NStepExperienceSource(self.env, self.agent, torch.device('cpu'), n_steps=3)
+        self.source.env_pool[0].step = Mock(return_value=(self.next_state_02, self.reward_02, self.done_02, Mock()))
 
         self.source.n_step_buffer.append(self.experience01)
         self.source.n_step_buffer.append(self.experience02)

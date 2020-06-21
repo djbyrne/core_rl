@@ -4,7 +4,7 @@ import argparse
 import random
 import numpy as np
 import torch
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 import pytorch_lightning as pl
 
 from algos.common import cli
@@ -45,7 +45,7 @@ def main(hparams) -> None:
 
     checkpoint_callback = ModelCheckpoint(
         save_top_k=1,
-        monitor='avg_reward',
+        monitor='total_reward',
         mode='max',
         prefix=''
     )
@@ -57,7 +57,7 @@ def main(hparams) -> None:
         max_epochs=hparams.max_steps,
         val_check_interval=1000,
         profiler=True,
-        checkpoint_callback=checkpoint_callback
+        checkpoint_callback=checkpoint_callback,
     )
 
     trainer.fit(model)

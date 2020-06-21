@@ -3,6 +3,7 @@ from collections import deque
 from typing import List, Tuple
 
 import numpy as np
+import torch
 from gym import Env
 from torch.utils.data import IterableDataset
 from algos.common.agents import Agent
@@ -61,24 +62,28 @@ class ExperienceSource:
     """
 
     def __init__(self, env: Env, agent: Agent, device):
-        self.env = env
+        assert isinstance(env, (Env, list))
+        assert isinstance(agent, Agent)
+        assert isinstance(device, torch.device)
+
+        self.env_pool = env if isinstance(env, list) else [env]
         self.agent = agent
-        self.state = [self.env.reset()]
+        self.state = [self.env_pool[0].reset()]
         self.device = device
 
     def _reset(self) -> None:
         """resets the env and state"""
-        self.state[0] = self.env.reset()
+        self.state[0] = self.env_pool[0].reset()
 
     def step(self) -> Tuple[Experience, float, bool]:
         """Takes a single step through the environment"""
         action = self.agent(self.state, self.device)
-        new_state, reward, done, _ = self.env.step(action[0])
+        new_state, reward, done, _ = self.env_pool[0].step(action[0])
         experience = Experience(state=self.state[0], action=action[0], reward=reward, new_state=new_state, done=done)
         self.state[0] = new_state
 
         if done:
-            self.state[0] = self.env.reset()
+            self.state[0] = self.env_pool[0].reset()
 
         return experience, reward, done
 
@@ -199,11 +204,11 @@ class EpisodicExperienceStream(ExperienceSource, IterableDataset):
     def step(self) -> Experience:
         """Carries out a single step in the environment"""
         action = self.agent(self.state, self.device)
-        new_state, reward, done, _ = self.env.step(action)
-        experience = Experience(state=self.state, action=action, reward=reward, new_state=new_state, done=done)
-        self.state = new_state
+        new_state, reward, done, _ = self.env_pool[0].step(action)
+        experience = Experience(state=self.state[0], action=action, reward=reward, new_state=new_state, done=done)
+        self.state[0] = new_state
 
         if done:
-            self.state = self.env.reset()
+            self.state[0] = self.env_pool[0].reset()
 
         return experience

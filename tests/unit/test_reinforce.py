@@ -23,7 +23,7 @@ class TestReinforce(TestCase):
         self.n_actions = self.env.action_space.n
         self.net = MLP(self.obs_shape, self.n_actions)
         self.agent = Agent(self.net)
-        self.xp_stream = EpisodicExperienceStream(self.env, self.agent, Mock(), episodes=4)
+        self.xp_stream = EpisodicExperienceStream(self.env, self.agent, torch.device('cpu'), episodes=4)
         self.rl_dataloader = DataLoader(self.xp_stream)
 
         parent_parser = argparse.ArgumentParser(add_help=False)
