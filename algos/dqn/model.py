@@ -14,6 +14,8 @@ tensorboard --logdir default
 from typing import Tuple, List, Dict
 import argparse
 from collections import OrderedDict
+
+import gym
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -24,7 +26,7 @@ from algos.common import wrappers
 from algos.common.agents import ValueAgent
 from algos.common.experience import ExperienceSource, RLDataset
 from algos.common.memory import ReplayBuffer
-from algos.common.networks import CNN
+from algos.common.networks import CNN, MLP
 
 
 class DQNLightning(pl.LightningModule):
@@ -36,7 +38,7 @@ class DQNLightning(pl.LightningModule):
 
         device = torch.device("cuda:0" if self.hparams.gpus > 0 else "cpu")
 
-        self.env = wrappers.make_env(self.hparams.env)
+        self.env = gym.make(self.hparams.env)
         self.env.seed(123)
 
         self.obs_shape = self.env.observation_space.shape
@@ -57,9 +59,9 @@ class DQNLightning(pl.LightningModule):
         self.episode_steps = 0
         self.total_episode_steps = 0
         self.reward_list = []
-        for _ in range(100):
-            self.reward_list.append(-21)
-        self.avg_reward = -21
+        for _ in range(10):
+            self.reward_list.append(0)
+        self.avg_reward = 0
 
     def populate(self, warm_start: int) -> None:
         """Populates the buffer with initial experience"""
@@ -71,8 +73,10 @@ class DQNLightning(pl.LightningModule):
 
     def build_networks(self) -> None:
         """Initializes the DQN train and target networks"""
-        self.net = CNN(self.obs_shape, self.n_actions)
-        self.target_net = CNN(self.obs_shape, self.n_actions)
+        # self.net = CNN(self.obs_shape, self.n_actions)
+        # self.target_net = CNN(self.obs_shape, self.n_actions)
+        self.net = MLP(self.obs_shape, self.n_actions)
+        self.target_net = MLP(self.obs_shape, self.n_actions)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
