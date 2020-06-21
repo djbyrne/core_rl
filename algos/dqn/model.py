@@ -63,7 +63,8 @@ class DQNLightning(pl.LightningModule):
         self.avg_reward = 0
 
     def make_env(self):
-        env = gym.make(self.hparams.env)
+        # env = gym.make(self.hparams.env)
+        env = wrappers.make_env(self.hparams.env)
         env.seed(123)
 
         return env
@@ -80,10 +81,10 @@ class DQNLightning(pl.LightningModule):
 
     def build_networks(self) -> None:
         """Initializes the DQN train and target networks"""
-        # self.net = CNN(self.obs_shape, self.n_actions)
-        # self.target_net = CNN(self.obs_shape, self.n_actions)
-        self.net = MLP(self.obs_shape, self.n_actions)
-        self.target_net = MLP(self.obs_shape, self.n_actions)
+        self.net = CNN(self.obs_shape, self.n_actions)
+        self.target_net = CNN(self.obs_shape, self.n_actions)
+        # self.net = MLP(self.obs_shape, self.n_actions)
+        # self.target_net = MLP(self.obs_shape, self.n_actions)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
