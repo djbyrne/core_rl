@@ -41,26 +41,26 @@ class TestValueAgent(TestCase):
         self.value_agent = ValueAgent(self.net, self.env.action_space.n)
 
     def test_value_agent(self):
-
+        self.value_agent.epsilon = 0.0
         actions = self.value_agent(self.states, self.device)
-        self.assertIsInstance(actions, list)
-
-    def test_value_agent_GET_ACTION_SINGLE(self):
-        actions = self.value_agent.get_action([self.state], self.device)
-        self.assertIsInstance(actions, list)
-        self.assertIsInstance(actions[0], int)
-        self.assertEqual(actions, [1])
-
-    def test_value_agent_GET_ACTION_MULTI(self):
-        actions = self.value_agent.get_action(self.states, self.device)
         self.assertIsInstance(actions, list)
         self.assertIsInstance(actions[0], int)
         self.assertEqual(actions, [1, 1, 1])
 
+    def test_value_agent_GET_ACTION_SINGLE(self):
+        action = self.value_agent.get_action(self.state, self.device)
+        self.assertIsInstance(action, int)
+        self.assertEqual(action, 1)
+
+    # def test_value_agent_GET_ACTION_MULTI(self):
+    #     action = self.value_agent.get_action(self.state, self.device)
+    #     self.assertIsInstance(action, int)
+    #     self.assertEqual(action, 1)
+    #     self.assertEqual(actions, [1, 1, 1])
+
     def test_value_agent_RANDOM(self):
-        actions = self.value_agent.get_random_action(self.states)
-        self.assertIsInstance(actions, list)
-        self.assertIsInstance(actions[0], int)
+        actions = self.value_agent.get_random_action()
+        self.assertIsInstance(actions, int)
 
 
 class TestPolicyAgent(TestCase):

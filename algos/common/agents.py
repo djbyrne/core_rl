@@ -69,22 +69,24 @@ class ValueAgent(Agent):
         """
         assert isinstance(states, list)
 
-        if np.random.random() < self.epsilon:
-            action = self.get_random_action(states)
-        else:
-            action = self.get_action(states, device)
-
-        return action
-
-    def get_random_action(self, states: List[torch.Tensor]) -> List[int]:
-        """returns a random action"""
         actions = []
-        for _ in states:
-            actions.append(randint(0, self.action_space - 1))
+
+        for s in states:
+
+            if np.random.random() < self.epsilon:
+                action = self.get_random_action()
+            else:
+                action = self.get_action(s, device)
+
+            actions.append(action)
 
         return actions
 
-    def get_action(self, state: torch.Tensor, device: torch.device) -> List[torch.Tensor]:
+    def get_random_action(self) -> List[int]:
+        """returns a random action"""
+        return randint(0, self.action_space - 1)
+
+    def get_action(self, state: np.ndarray, device: torch.device) -> List[torch.Tensor]:
         """
             Returns the best action based on the Q values of the network
             Args:
@@ -93,19 +95,16 @@ class ValueAgent(Agent):
             Returns:
                 action defined by Q values
         """
+        assert len(state.shape) == 1
+        torch_state = default_states_preprocessor(state)
 
-        actions = []
-        for s in state:
-            s = default_states_preprocessor(s)
+        if device.type != 'cpu':
+            torch_state = torch_state.cuda(device)
 
-            if device.type != 'cpu':
-                s = s.cuda(device)
+        q_values = self.net(torch_state)
+        _, action = torch.max(q_values, dim=0)
 
-            q_values = self.net(s)
-            _, action = torch.max(q_values, dim=0)
-            actions.append(action.item())
-
-        return actions
+        return action.item()
 
     def update_epsilon(self, step: int) -> None:
         """
