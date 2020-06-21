@@ -168,6 +168,7 @@ class DQNLightning(pl.LightningModule):
                   }
 
         return OrderedDict({'loss': loss, 'avg_reward': torch.tensor(self.avg_reward),
+                            'total_reward': torch.tensor(self.total_reward),
                             'log': log, 'progress_bar': status})
 
     def test_step(self, *args, **kwargs) -> Dict[str, torch.Tensor]:
