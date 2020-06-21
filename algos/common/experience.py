@@ -68,24 +68,34 @@ class ExperienceSource:
 
         self.env_pool = env if isinstance(env, list) else [env]
         self.agent = agent
-        self.state = [self.env_pool[0].reset()]
+        self.states = []
+        self._reset_all()
         self.device = device
 
-    def _reset(self) -> None:
+    def _reset_all(self) -> None:
         """resets the env and state"""
-        self.state[0] = self.env_pool[0].reset()
+
+        self.states = [env.reset() for env in self.env_pool]
 
     def step(self) -> Tuple[Experience, float, bool]:
         """Takes a single step through the environment"""
-        action = self.agent(self.state, self.device)
-        new_state, reward, done, _ = self.env_pool[0].step(action[0])
-        experience = Experience(state=self.state[0], action=action[0], reward=reward, new_state=new_state, done=done)
-        self.state[0] = new_state
+        experiences, rewards, dones = [], [], []
 
-        if done:
-            self.state[0] = self.env_pool[0].reset()
+        for idx, env in enumerate(self.env_pool):
+            action = self.agent(self.states[idx], self.device)
+            new_state, reward, done, _ = env.step(action)
+            experience = Experience(state=self.states[idx], action=action, reward=reward,
+                                    new_state=new_state, done=done)
+            self.states[idx] = new_state
 
-        return experience, reward, done
+            if done:
+                self.states[idx] = env.reset()
+
+            experiences.append(experience)
+            rewards.append(reward)
+            dones.append(done)
+
+        return experiences, rewards, dones
 
     def run_episode(self) -> float:
         """Carries out a single episode and returns the total reward. This is used for testing"""
@@ -94,7 +104,8 @@ class ExperienceSource:
 
         while not done:
             _, reward, done = self.step()
-            total_reward += reward
+            for rew in reward:
+                total_reward += rew
 
         return total_reward
 
@@ -135,9 +146,9 @@ class NStepExperienceSource(ExperienceSource):
         Returns:
             Experience
         """
-        exp, _, _ = super().step()
-        self.n_step_buffer.append(exp)
-        return exp
+        experiences, _, _ = super().step()
+        self.n_step_buffer.append(experiences[0])
+        return experiences[0]
 
     def get_transition_info(self, gamma=0.9) -> Tuple[np.float, np.array, np.int]:
         """
@@ -203,12 +214,12 @@ class EpisodicExperienceStream(ExperienceSource, IterableDataset):
 
     def step(self) -> Experience:
         """Carries out a single step in the environment"""
-        action = self.agent(self.state, self.device)
+        action = self.agent(self.states, self.device)
         new_state, reward, done, _ = self.env_pool[0].step(action)
-        experience = Experience(state=self.state[0], action=action, reward=reward, new_state=new_state, done=done)
-        self.state[0] = new_state
+        experience = Experience(state=self.states[0], action=action, reward=reward, new_state=new_state, done=done)
+        self.states[0] = new_state
 
         if done:
-            self.state[0] = self.env_pool[0].reset()
+            self.states[0] = self.env_pool[0].reset()
 
         return experience

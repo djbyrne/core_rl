@@ -38,11 +38,10 @@ class DQNLightning(pl.LightningModule):
 
         device = torch.device("cuda:0" if self.hparams.gpus > 0 else "cpu")
 
-        self.env = gym.make(self.hparams.env)
-        self.env.seed(123)
+        self.env = [self.make_env() for i in range(2)]
 
-        self.obs_shape = self.env.observation_space.shape
-        self.n_actions = self.env.action_space.n
+        self.obs_shape = self.env[0].observation_space.shape
+        self.n_actions = self.env[0].action_space.n
 
         self.net = None
         self.target_net = None
@@ -63,13 +62,21 @@ class DQNLightning(pl.LightningModule):
             self.reward_list.append(0)
         self.avg_reward = 0
 
+    def make_env(self):
+        env = gym.make(self.hparams.env)
+        env.seed(123)
+
+        return env
+
     def populate(self, warm_start: int) -> None:
         """Populates the buffer with initial experience"""
         if warm_start > 0:
             for _ in range(warm_start):
                 self.source.agent.epsilon = 1.0
                 exp, _, _ = self.source.step()
-                self.buffer.append(exp)
+
+                for sample in exp:
+                    self.buffer.append(sample)
 
     def build_networks(self) -> None:
         """Initializes the DQN train and target networks"""
@@ -126,13 +133,14 @@ class DQNLightning(pl.LightningModule):
         Returns:
             Training loss and log metrics
         """
-        self.agent.update_epsilon(self.global_step)
+        self.agent.update_epsilon(self.global_step * len(self.env))
 
         # step through environment with agent and add to buffer
-        exp, reward, done = self.source.step()
-        self.buffer.append(exp)
+        exp, rewards, dones = self.source.step()
+        for sample in exp:
+            self.buffer.append(sample)
 
-        self.episode_reward += reward
+        self.episode_reward += rewards[0]
         self.episode_steps += 1
 
         # calculates training loss
@@ -141,17 +149,17 @@ class DQNLightning(pl.LightningModule):
         if self.trainer.use_dp or self.trainer.use_ddp2:
             loss = loss.unsqueeze(0)
 
-        if done:
+        if dones[0]:
             self.total_reward = self.episode_reward
             self.reward_list.append(self.total_reward)
-            self.avg_reward = sum(self.reward_list[-100:]) / 100
+            self.avg_reward = sum(self.reward_list[-10:]) / 10
             self.episode_count += 1
             self.episode_reward = 0
             self.total_episode_steps = self.episode_steps
             self.episode_steps = 0
 
         # Soft update of target network
-        if self.global_step % self.hparams.sync_rate == 0:
+        if self.global_step * len(self.env) % self.hparams.sync_rate == 0:
             self.target_net.load_state_dict(self.net.state_dict())
 
         log = {'total_reward': torch.tensor(self.total_reward).to(self.device),
@@ -197,7 +205,7 @@ class DQNLightning(pl.LightningModule):
 
         dataset = RLDataset(self.buffer, self.hparams.episode_length)
         dataloader = DataLoader(dataset=dataset,
-                                batch_size=self.hparams.batch_size,
+                                batch_size=self.hparams.batch_size * len(self.env),
                                 )
         return dataloader
 

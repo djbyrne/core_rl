@@ -56,7 +56,7 @@ class ValueAgent(Agent):
         self.eps_frames = eps_frames
 
     @torch.no_grad()
-    def __call__(self, states: List[torch.Tensor], device: str) -> List[int]:
+    def __call__(self, state: np.ndarray, device: str) -> List[int]:
         """
         Takes in the current state and returns the action based on the agents policy
 
@@ -67,20 +67,14 @@ class ValueAgent(Agent):
         Returns:
             action defined by policy
         """
-        assert isinstance(states, list)
+        # assert isinstance(states, list)
 
-        actions = []
+        if np.random.random() < self.epsilon:
+            action = self.get_random_action()
+        else:
+            action = self.get_action(state, device)
 
-        for s in states:
-
-            if np.random.random() < self.epsilon:
-                action = self.get_random_action()
-            else:
-                action = self.get_action(s, device)
-
-            actions.append(action)
-
-        return actions
+        return action
 
     def get_random_action(self) -> List[int]:
         """returns a random action"""
@@ -95,7 +89,7 @@ class ValueAgent(Agent):
             Returns:
                 action defined by Q values
         """
-        assert len(state.shape) == 1
+        # assert len(state.shape) == 1
         torch_state = default_states_preprocessor(state)
 
         if device.type != 'cpu':

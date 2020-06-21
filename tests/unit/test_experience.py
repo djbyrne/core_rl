@@ -14,7 +14,7 @@ from algos.common.wrappers import ToTensor
 
 class DummyAgent(Agent):
     def __call__(self, states, agent_states):
-        return [0]
+        return 0
 
 
 class TestEpisodicExperience(TestCase):
@@ -56,7 +56,10 @@ class TestExperienceSource(TestCase):
 
     def test_step(self):
         exp, reward, done = self.source.step()
-        self.assertEqual(len(exp), 5)
+        self.assertEqual(len(exp), 1)
+        self.assertEqual(len(reward), 1)
+        self.assertEqual(len(done), 1)
+        self.assertIsInstance(exp[0], Experience)
 
     def test_episode(self):
         total_reward = self.source.run_episode()

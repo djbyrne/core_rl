@@ -43,9 +43,9 @@ class TestValueAgent(TestCase):
     def test_value_agent(self):
         self.value_agent.epsilon = 0.0
         actions = self.value_agent(self.states, self.device)
-        self.assertIsInstance(actions, list)
-        self.assertIsInstance(actions[0], int)
-        self.assertEqual(actions, [1, 1, 1])
+        self.assertIsInstance(actions, int)
+        # self.assertEqual(actions, [1, 1, 1])
+        self.assertEqual(actions, 1)
 
     def test_value_agent_GET_ACTION_SINGLE(self):
         action = self.value_agent.get_action(self.state, self.device)
