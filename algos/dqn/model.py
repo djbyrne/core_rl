@@ -155,6 +155,8 @@ class DQNLightning(pl.LightningModule):
 
         if dones[0]:
             self.total_reward = self.episode_reward
+            if self.total_reward == 200:
+                print("COMPLETE! IN %s STEPS", self.global_step)
             self.reward_list.append(self.total_reward)
             self.avg_reward = sum(self.reward_list[-10:]) / 10
             self.episode_count += 1

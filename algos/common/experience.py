@@ -182,11 +182,21 @@ class NStepExperienceSource(ExperienceSource):
         get the accumulated transition info for the n_step_buffer
         Args:
             gamma: discount factor
+            buffer: current n-step buffer
 
         Returns:
             multi step reward, final observation and done
         """
-        last_experience = buffer[-1]
+        done_index = -1
+
+        # check for a terminal state in the buffer
+        # TODO: Refactor for efficiency
+        for idx, exp in enumerate(buffer):
+            if exp.done:
+                done_index = idx
+
+        # get the final state. This is either the last entry in the buffer or the terminal state in the buffer
+        last_experience = buffer[done_index]
         final_state = last_experience.new_state
         done = last_experience.done
         reward = last_experience.reward
@@ -194,12 +204,6 @@ class NStepExperienceSource(ExperienceSource):
         # calculate reward
         # in reverse order, go through all the experiences up till the first experience
         # find if there is a done in the buffer
-
-        done_index = -1
-        #
-        # for idx, exp in enumerate(buffer):
-        #     if exp.done == 1:
-        #         done_index = idx
 
         for experience in reversed(list(buffer)[:done_index]):
             reward_t = experience.reward
