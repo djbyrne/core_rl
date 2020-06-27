@@ -126,16 +126,16 @@ class NStepExperienceSource(ExperienceSource):
         """
         experiences, rewards, dones = [], [], []
 
-        step_exp = self.single_step()
+        for env_idx in range(len(self.env_pool)):
 
-        for idx, exp in enumerate(step_exp):
+            step_exp, step_reward, step_done = self.single_step(env_idx)
 
-            while len(self.n_step_buffers[idx]) < self.n_steps:
+            while len(self.n_step_buffers[env_idx]) < self.n_steps:
                 # FIXME: This should only update the current buffer, not all
-                self.single_step()
+                step_exp, step_reward, step_done = self.single_step(env_idx)
 
-            reward, next_state, done = self.get_transition_info(self.n_step_buffers[idx])
-            first_experience = self.n_step_buffers[idx][0]
+            reward, next_state, done = self.get_transition_info(self.n_step_buffers[env_idx])
+            first_experience = self.n_step_buffers[env_idx][0]
             multi_step_experience = Experience(first_experience.state,
                                                first_experience.action,
                                                reward,
@@ -143,22 +143,34 @@ class NStepExperienceSource(ExperienceSource):
                                                next_state)
 
             experiences.append(multi_step_experience)
-            rewards.append(exp.reward)
-            dones.append(exp.done)
+            rewards.append(step_exp.reward)
+            dones.append(step_exp.done)
 
         return experiences, rewards, dones
 
-    def single_step(self) -> Experience:
+    def single_step(self, env_idx: int) -> Experience:
         """
         Takes a  single step in the environment and appends it to the n-step buffer
 
         Returns:
             Experience
         """
-        experiences, _, _ = super().step()
-        for idx, exp in enumerate(experiences):
-            self.n_step_buffers[idx].append(exp)
-        return experiences
+        # experiences, _, _ = super().step()
+        # for idx, exp in enumerate(experiences):
+        #     self.n_step_buffers[idx].append(exp)
+        # return experiences
+        action = self.agent(self.states[env_idx], self.device)
+        new_state, reward, done, _ = self.env_pool[env_idx].step(action)
+        experience = Experience(state=self.states[env_idx], action=action, reward=reward,
+                                new_state=new_state, done=done)
+        self.states[env_idx] = new_state
+
+        if done:
+            self.states[env_idx] = self.env_pool[env_idx].reset()
+
+        self.n_step_buffers[env_idx].append(experience)
+
+        return experience, reward, done
 
     def get_transition_info(self, buffer: deque, gamma=0.9) -> Tuple[np.float, np.array, np.int]:
         """
