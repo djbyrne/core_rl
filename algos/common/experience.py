@@ -130,12 +130,12 @@ class NStepExperienceSource(ExperienceSource):
 
         for idx, exp in enumerate(step_exp):
 
-            while len(self.n_step_buffers[0]) < self.n_steps:
+            while len(self.n_step_buffers[idx]) < self.n_steps:
                 # FIXME: This should only update the current buffer, not all
                 self.single_step()
 
-            reward, next_state, done = self.get_transition_info()
-            first_experience = self.n_step_buffers[0][0]
+            reward, next_state, done = self.get_transition_info(self.n_step_buffers[idx])
+            first_experience = self.n_step_buffers[idx][0]
             multi_step_experience = Experience(first_experience.state,
                                                first_experience.action,
                                                reward,
@@ -156,10 +156,11 @@ class NStepExperienceSource(ExperienceSource):
             Experience
         """
         experiences, _, _ = super().step()
-        self.n_step_buffers[0].append(experiences[0])
+        for idx, exp in enumerate(experiences):
+            self.n_step_buffers[idx].append(exp)
         return experiences
 
-    def get_transition_info(self, gamma=0.9) -> Tuple[np.float, np.array, np.int]:
+    def get_transition_info(self, buffer: deque, gamma=0.9) -> Tuple[np.float, np.array, np.int]:
         """
         get the accumulated transition info for the n_step_buffer
         Args:
@@ -168,14 +169,14 @@ class NStepExperienceSource(ExperienceSource):
         Returns:
             multi step reward, final observation and done
         """
-        last_experience = self.n_step_buffers[0][-1]
+        last_experience = buffer[-1]
         final_state = last_experience.new_state
         done = last_experience.done
         reward = last_experience.reward
 
         # calculate reward
         # in reverse order, go through all the experiences up till the first experience
-        for experience in reversed(list(self.n_step_buffers[0])[:-1]):
+        for experience in reversed(list(buffer)[:-1]):
             reward_t = experience.reward
             new_state_t = experience.new_state
             done_t = experience.done

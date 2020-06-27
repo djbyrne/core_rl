@@ -38,7 +38,7 @@ class DQNLightning(pl.LightningModule):
 
         device = torch.device("cuda:0" if self.hparams.gpus > 0 else "cpu")
 
-        self.env = [self.make_env() for _ in range(1)]
+        self.env = [self.make_env() for _ in range(4)]
 
         self.obs_shape = self.env[0].observation_space.shape
         self.n_actions = self.env[0].action_space.n

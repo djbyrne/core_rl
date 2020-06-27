@@ -115,7 +115,7 @@ class TestNStepExperienceSource(TestCase):
         self.source.n_step_buffers[0].append(self.experience02)
         self.source.n_step_buffers[0].append(self.experience03)
 
-        reward, next_state, done = self.source.get_transition_info()
+        reward, next_state, done = self.source.get_transition_info(self.source.n_step_buffers[0])
 
         reward_01 = self.experience02.reward + 0.9 * self.experience03.reward * (1 - done)
         reward_gt = self.experience01.reward + 0.9 * reward_01 * (1 - done)
@@ -167,6 +167,3 @@ class TestRLDataset(TestCase):
             self.assertEqual(sample_batched[2].shape, torch.Size([32]))
             self.assertEqual(sample_batched[3].shape, torch.Size([32]))
             self.assertEqual(sample_batched[4].shape, torch.Size([32, 4, 84, 84]))
-
-
-
