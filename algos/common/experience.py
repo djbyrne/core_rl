@@ -115,7 +115,7 @@ class NStepExperienceSource(ExperienceSource):
     def __init__(self, env: Env, agent: Agent, device, n_steps: int = 1):
         super().__init__(env, agent, device)
         self.n_steps = n_steps
-        self.n_step_buffer = deque(maxlen=n_steps)
+        self.n_step_buffers = [deque(maxlen=n_steps) for _ in range(len(self.env_pool))]
 
     def step(self) -> Tuple[Experience, float, bool]:
         """
@@ -124,20 +124,29 @@ class NStepExperienceSource(ExperienceSource):
         Returns:
             Experience
         """
-        exp = self.single_step()
+        experiences, rewards, dones = [], [], []
 
-        while len(self.n_step_buffer) < self.n_steps:
-            self.single_step()
+        step_exp = self.single_step()
 
-        reward, next_state, done = self.get_transition_info()
-        first_experience = self.n_step_buffer[0]
-        multi_step_experience = Experience(first_experience.state,
-                                           first_experience.action,
-                                           reward,
-                                           done,
-                                           next_state)
+        for idx, exp in enumerate(step_exp):
 
-        return multi_step_experience, exp.reward, exp.done
+            while len(self.n_step_buffers[0]) < self.n_steps:
+                # FIXME: This should only update the current buffer, not all
+                self.single_step()
+
+            reward, next_state, done = self.get_transition_info()
+            first_experience = self.n_step_buffers[0][0]
+            multi_step_experience = Experience(first_experience.state,
+                                               first_experience.action,
+                                               reward,
+                                               done,
+                                               next_state)
+
+            experiences.append(multi_step_experience)
+            rewards.append(exp.reward)
+            dones.append(exp.done)
+
+        return experiences, rewards, dones
 
     def single_step(self) -> Experience:
         """
@@ -147,8 +156,8 @@ class NStepExperienceSource(ExperienceSource):
             Experience
         """
         experiences, _, _ = super().step()
-        self.n_step_buffer.append(experiences[0])
-        return experiences[0]
+        self.n_step_buffers[0].append(experiences[0])
+        return experiences
 
     def get_transition_info(self, gamma=0.9) -> Tuple[np.float, np.array, np.int]:
         """
@@ -159,14 +168,14 @@ class NStepExperienceSource(ExperienceSource):
         Returns:
             multi step reward, final observation and done
         """
-        last_experience = self.n_step_buffer[-1]
+        last_experience = self.n_step_buffers[0][-1]
         final_state = last_experience.new_state
         done = last_experience.done
         reward = last_experience.reward
 
         # calculate reward
         # in reverse order, go through all the experiences up till the first experience
-        for experience in reversed(list(self.n_step_buffer)[:-1]):
+        for experience in reversed(list(self.n_step_buffers[0])[:-1]):
             reward_t = experience.reward
             new_state_t = experience.new_state
             done_t = experience.done

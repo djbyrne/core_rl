@@ -49,13 +49,14 @@ class PERDQNLightning(DQNLightning):
 
         indices = indices.cpu().numpy()
 
-        self.agent.update_epsilon(self.global_step)
+        self.agent.update_epsilon(self.global_step * len(self.env))
 
         # step through environment with agent and add to buffer
-        exp, reward, done = self.source.step()
-        self.buffer.append(exp)
+        exps, rewards, dones = self.source.step()
+        for sample in exps:
+            self.buffer.append(sample)
 
-        self.episode_reward += reward
+        self.episode_reward += rewards[0]
         self.episode_steps += 1
 
         # calculates training loss
@@ -68,17 +69,17 @@ class PERDQNLightning(DQNLightning):
         if self.trainer.use_dp or self.trainer.use_ddp2:
             loss = loss.unsqueeze(0)
 
-        if done:
+        if dones[0]:
             self.total_reward = self.episode_reward
             self.reward_list.append(self.total_reward)
-            self.avg_reward = sum(self.reward_list[-100:]) / 100
+            self.avg_reward = sum(self.reward_list[-10:]) / 10
             self.episode_count += 1
             self.episode_reward = 0
             self.total_episode_steps = self.episode_steps
             self.episode_steps = 0
 
         # Soft update of target network
-        if self.global_step % self.hparams.sync_rate == 0:
+        if self.global_step * len(self.env) % self.hparams.sync_rate == 0:
             self.target_net.load_state_dict(self.net.state_dict())
 
         log = {'total_reward': torch.tensor(self.total_reward).to(self.device),
@@ -127,8 +128,8 @@ class PERDQNLightning(DQNLightning):
         self.buffer = PERBuffer(self.hparams.replay_size)
         self.populate(self.hparams.warm_start_size)
 
-        dataset = PrioRLDataset(self.buffer, self.hparams.batch_size)
+        dataset = PrioRLDataset(self.buffer, self.hparams.batch_size * len(self.env))
         dataloader = DataLoader(dataset=dataset,
-                                batch_size=self.hparams.batch_size,
+                                batch_size=self.hparams.batch_size * len(self.env),
                                 )
         return dataloader

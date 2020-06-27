@@ -22,7 +22,7 @@ class TestValueModels(TestCase):
             "--warm_start_steps", "100",
             "--episode_length", "100",
             "--gpus", "0",
-            # "--env", "CartPole-v0"
+            "--env", "CartPole-v0"
         ]
         self.hparams = parent_parser.parse_args(args_list)
 
@@ -30,7 +30,8 @@ class TestValueModels(TestCase):
             gpus=self.hparams.gpus,
             max_steps=100,
             max_epochs=100,  # Set this as the same as max steps to ensure that it doesn't stop early
-            val_check_interval=1000  # This just needs 'some' value, does not effect training right now
+            val_check_interval=1000,  # This just needs 'some' value, does not effect training right now
+            fast_dev_run=True
         )
 
     def test_dqn(self):

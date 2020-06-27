@@ -38,7 +38,7 @@ class DQNLightning(pl.LightningModule):
 
         device = torch.device("cuda:0" if self.hparams.gpus > 0 else "cpu")
 
-        self.env = [self.make_env() for i in range(2)]
+        self.env = [self.make_env() for _ in range(1)]
 
         self.obs_shape = self.env[0].observation_space.shape
         self.n_actions = self.env[0].action_space.n
@@ -63,8 +63,8 @@ class DQNLightning(pl.LightningModule):
         self.avg_reward = 0
 
     def make_env(self):
-        # env = gym.make(self.hparams.env)
-        env = wrappers.make_env(self.hparams.env)
+        env = gym.make(self.hparams.env)
+        # env = wrappers.make_env(self.hparams.env)
         env.seed(123)
 
         return env
@@ -76,15 +76,18 @@ class DQNLightning(pl.LightningModule):
                 self.source.agent.epsilon = 1.0
                 exp, _, _ = self.source.step()
 
-                for sample in exp:
-                    self.buffer.append(sample)
+                if isinstance(exp, list):
+                    for sample in exp:
+                        self.buffer.append(sample)
+                else:
+                    self.buffer.append(exp)
 
     def build_networks(self) -> None:
         """Initializes the DQN train and target networks"""
-        self.net = CNN(self.obs_shape, self.n_actions)
-        self.target_net = CNN(self.obs_shape, self.n_actions)
-        # self.net = MLP(self.obs_shape, self.n_actions)
-        # self.target_net = MLP(self.obs_shape, self.n_actions)
+        # self.net = CNN(self.obs_shape, self.n_actions)
+        # self.target_net = CNN(self.obs_shape, self.n_actions)
+        self.net = MLP(self.obs_shape, self.n_actions)
+        self.target_net = MLP(self.obs_shape, self.n_actions)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """

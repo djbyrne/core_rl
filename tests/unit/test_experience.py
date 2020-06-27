@@ -91,27 +91,29 @@ class TestNStepExperienceSource(TestCase):
         self.experience03 = Experience(self.state_02, self.action_02, self.reward_02, self.done_02, self.next_state_02)
 
     def test_step(self):
-        self.assertEqual(len(self.source.n_step_buffer), 0)
+        self.assertEqual(len(self.source.n_step_buffers[0]), 0)
         exp, reward, done = self.source.step()
-        self.assertEqual(len(exp), 5)
-        self.assertEqual(len(self.source.n_step_buffer), self.n_step)
+        self.assertEqual(len(exp[0]), 5)
+        self.assertEqual(len(self.source.n_step_buffers[0]), self.n_step)
 
     def test_multi_step(self):
         self.source.env_pool[0].step = Mock(return_value=(self.next_state_02, self.reward_02, self.done_02, Mock()))
-        self.source.n_step_buffer.append(self.experience01)
-        self.source.n_step_buffer.append(self.experience01)
+        self.source.n_step_buffers[0].append(self.experience01)
+        self.source.n_step_buffers[0].append(self.experience01)
 
         exp, reward, done = self.source.step()
 
-        next_state = exp[4]
+        next_state = exp[0][4]
         self.assertEqual(next_state.all(), self.next_state_02.all())
 
     def test_discounted_transition(self):
         self.source = NStepExperienceSource(self.env, self.agent, torch.device('cpu'), n_steps=3)
 
-        self.source.n_step_buffer.append(self.experience01)
-        self.source.n_step_buffer.append(self.experience02)
-        self.source.n_step_buffer.append(self.experience03)
+        # TODO: evaluate for multiple env buffers
+
+        self.source.n_step_buffers[0].append(self.experience01)
+        self.source.n_step_buffers[0].append(self.experience02)
+        self.source.n_step_buffers[0].append(self.experience03)
 
         reward, next_state, done = self.source.get_transition_info()
 
@@ -126,18 +128,18 @@ class TestNStepExperienceSource(TestCase):
         self.source = NStepExperienceSource(self.env, self.agent, torch.device('cpu'), n_steps=3)
         self.source.env_pool[0].step = Mock(return_value=(self.next_state_02, self.reward_02, self.done_02, Mock()))
 
-        self.source.n_step_buffer.append(self.experience01)
-        self.source.n_step_buffer.append(self.experience02)
+        self.source.n_step_buffers[0].append(self.experience01)
+        self.source.n_step_buffers[0].append(self.experience02)
 
         reward_gt = 1.71
 
         exp, reward, done = self.source.step()
 
-        self.assertEqual(exp[0].all(), self.experience01.state.all())
-        self.assertEqual(exp[1], self.experience01.action)
-        self.assertEqual(exp[2], reward_gt)
-        self.assertEqual(exp[3], self.experience02.done)
-        self.assertEqual(exp[4].all(), self.experience02.new_state.all())
+        self.assertEqual(exp[0][0].all(), self.experience01.state.all())
+        self.assertEqual(exp[0][1], self.experience01.action)
+        self.assertEqual(exp[0][2], reward_gt)
+        self.assertEqual(exp[0][3], self.experience02.done)
+        self.assertEqual(exp[0][4].all(), self.experience02.new_state.all())
 
 
 class TestRLDataset(TestCase):
