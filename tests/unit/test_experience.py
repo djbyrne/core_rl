@@ -91,12 +91,14 @@ class TestNStepExperienceSource(TestCase):
         self.experience03 = Experience(self.state_02, self.action_02, self.reward_02, self.done_02, self.next_state_02)
 
     def test_step(self):
+        """Test that single step is correct"""
         self.assertEqual(len(self.source.n_step_buffers[0]), 0)
         exp, reward, done = self.source.step()
         self.assertEqual(len(exp[0]), 5)
         self.assertEqual(len(self.source.n_step_buffers[0]), self.n_step)
 
     def test_multi_step(self):
+        """Test that multi step peforms correctly"""
         self.source.env_pool[0].step = Mock(return_value=(self.next_state_02, self.reward_02, self.done_02, Mock()))
         self.source.n_step_buffers[0].append(self.experience01)
         self.source.n_step_buffers[0].append(self.experience01)
@@ -107,6 +109,7 @@ class TestNStepExperienceSource(TestCase):
         self.assertEqual(next_state.all(), self.next_state_02.all())
 
     def test_discounted_transition(self):
+        """Test that the discounted experience for multi step is correct"""
         self.source = NStepExperienceSource(self.env, self.agent, torch.device('cpu'), n_steps=3)
 
         # TODO: evaluate for multiple env buffers
@@ -125,6 +128,8 @@ class TestNStepExperienceSource(TestCase):
         self.assertEqual(self.experience03.done, done)
 
     def test_multi_step_discount(self):
+        """Test that the discounted experience for multi step is correct"""
+
         self.source = NStepExperienceSource(self.env, self.agent, torch.device('cpu'), n_steps=3)
         self.source.env_pool[0].step = Mock(return_value=(self.next_state_02, self.reward_02, self.done_02, Mock()))
 
@@ -140,6 +145,21 @@ class TestNStepExperienceSource(TestCase):
         self.assertEqual(exp[0][2], reward_gt)
         self.assertEqual(exp[0][3], self.experience02.done)
         self.assertEqual(exp[0][4].all(), self.experience02.new_state.all())
+
+    def test_reset_env(self):
+        """Test that reset_env resets the state and the n_step buffer"""
+        self.source = NStepExperienceSource(self.env, self.agent, torch.device('cpu'), n_steps=3)
+        self.source.env_pool[0].step = Mock(return_value=(self.next_state_02, self.reward_02, self.done_02, Mock()))
+        self.source.env_pool[0].reset = Mock(return_value=(self.next_state))
+
+        self.source.n_step_buffers[0].append(self.experience01)
+        self.source.n_step_buffers[0].append(self.experience02)
+        self.source.n_step_buffers[0].append(self.experience02)
+
+        self.source._reset_env(0)
+
+        self.assertEqual(self.source.states[0].all(), self.next_state.all())
+        self.assertEqual(len(self.source.n_step_buffers[0]), 0)
 
 
 class TestRLDataset(TestCase):

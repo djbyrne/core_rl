@@ -117,6 +117,15 @@ class NStepExperienceSource(ExperienceSource):
         self.n_steps = n_steps
         self.n_step_buffers = [deque(maxlen=n_steps) for _ in range(len(self.env_pool))]
 
+    def _reset_env(self, env_idx) -> None:
+        """resets the env and state for the env at index env_idx in the env_pool"""
+
+        # reset state
+        self.states[env_idx] = self.env_pool[env_idx].reset()
+
+        # reset n_step_buffer
+        self.n_step_buffers[env_idx].clear()
+
     def step(self) -> Tuple[Experience, float, bool]:
         """
         Takes an n-step in the environment
@@ -155,20 +164,16 @@ class NStepExperienceSource(ExperienceSource):
         Returns:
             Experience
         """
-        # experiences, _, _ = super().step()
-        # for idx, exp in enumerate(experiences):
-        #     self.n_step_buffers[idx].append(exp)
-        # return experiences
         action = self.agent(self.states[env_idx], self.device)
         new_state, reward, done, _ = self.env_pool[env_idx].step(action)
         experience = Experience(state=self.states[env_idx], action=action, reward=reward,
                                 new_state=new_state, done=done)
+
         self.states[env_idx] = new_state
+        self.n_step_buffers[env_idx].append(experience)
 
         if done:
             self.states[env_idx] = self.env_pool[env_idx].reset()
-
-        self.n_step_buffers[env_idx].append(experience)
 
         return experience, reward, done
 
@@ -188,7 +193,15 @@ class NStepExperienceSource(ExperienceSource):
 
         # calculate reward
         # in reverse order, go through all the experiences up till the first experience
-        for experience in reversed(list(buffer)[:-1]):
+        # find if there is a done in the buffer
+
+        done_index = -1
+        #
+        # for idx, exp in enumerate(buffer):
+        #     if exp.done == 1:
+        #         done_index = idx
+
+        for experience in reversed(list(buffer)[:done_index]):
             reward_t = experience.reward
             new_state_t = experience.new_state
             done_t = experience.done
