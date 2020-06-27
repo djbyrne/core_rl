@@ -112,20 +112,39 @@ class TestNStepExperienceSource(TestCase):
         """Test that the discounted experience for multi step is correct"""
         self.source = NStepExperienceSource(self.env, self.agent, torch.device('cpu'), n_steps=3)
 
-        # TODO: evaluate for multiple env buffers
-
         self.source.n_step_buffers[0].append(self.experience01)
         self.source.n_step_buffers[0].append(self.experience02)
         self.source.n_step_buffers[0].append(self.experience03)
 
         reward, next_state, done = self.source.get_transition_info(self.source.n_step_buffers[0])
 
-        reward_01 = self.experience02.reward + 0.9 * self.experience03.reward * (1 - done)
-        reward_gt = self.experience01.reward + 0.9 * reward_01 * (1 - done)
+        reward_01 = self.experience02.reward + 0.9 * self.experience03.reward * (1 - self.experience03.done)
+        reward_gt = self.experience01.reward + 0.9 * reward_01 * (1 - self.experience02.done)
 
         self.assertEqual(reward, reward_gt)
         self.assertEqual(next_state.all(), self.next_state_02.all())
         self.assertEqual(self.experience03.done, done)
+
+    def test_discounted_transition_terminal_state(self):
+        """
+        Test that when thee is a terminal state in the n-step buffer that the discounted return only takes into
+        account experiences up to the terminal state
+        """
+        self.source = NStepExperienceSource(self.env, self.agent, torch.device('cpu'), n_steps=3)
+
+        self.experience_terminal = Experience(self.state_02, self.action_02, self.reward_02, True, self.next_state_02)
+
+        self.source.n_step_buffers[0].append(self.experience01)
+        self.source.n_step_buffers[0].append(self.experience_terminal)
+        self.source.n_step_buffers[0].append(self.experience03)
+
+        reward, next_state, done = self.source.get_transition_info(self.source.n_step_buffers[0])
+
+        # reward_01 = self.experience02.reward + 0.9 * self.experience03.reward * (1 - done)
+        reward_gt = self.experience01.reward + 0.9 * self.experience_terminal.reward * (1 - self.experience01.done)
+
+        self.assertEqual(reward, reward_gt)
+        self.assertEqual(next_state.all(), self.experience_terminal.new_state.all())
 
     def test_multi_step_discount(self):
         """Test that the discounted experience for multi step is correct"""
@@ -145,21 +164,6 @@ class TestNStepExperienceSource(TestCase):
         self.assertEqual(exp[0][2], reward_gt)
         self.assertEqual(exp[0][3], self.experience02.done)
         self.assertEqual(exp[0][4].all(), self.experience02.new_state.all())
-
-    def test_reset_env(self):
-        """Test that reset_env resets the state and the n_step buffer"""
-        self.source = NStepExperienceSource(self.env, self.agent, torch.device('cpu'), n_steps=3)
-        self.source.env_pool[0].step = Mock(return_value=(self.next_state_02, self.reward_02, self.done_02, Mock()))
-        self.source.env_pool[0].reset = Mock(return_value=(self.next_state))
-
-        self.source.n_step_buffers[0].append(self.experience01)
-        self.source.n_step_buffers[0].append(self.experience02)
-        self.source.n_step_buffers[0].append(self.experience02)
-
-        self.source._reset_env(0)
-
-        self.assertEqual(self.source.states[0].all(), self.next_state.all())
-        self.assertEqual(len(self.source.n_step_buffers[0]), 0)
 
 
 class TestRLDataset(TestCase):
