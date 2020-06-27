@@ -14,10 +14,7 @@ import argparse
 
 import torch
 
-from algos.common import wrappers
-from algos.common.agents import ValueAgent
 from algos.common.experience import NStepExperienceSource
-from algos.common.memory import ReplayBuffer
 from algos.dqn.model import DQNLightning
 
 class NStepDQNLightning(DQNLightning):
@@ -25,7 +22,6 @@ class NStepDQNLightning(DQNLightning):
 
     def __init__(self, hparams: argparse.Namespace) -> None:
         super().__init__(hparams)
-        self.hparams = hparams
 
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.source = NStepExperienceSource(self.env, self.agent, device, n_steps=self.hparams.n_steps)

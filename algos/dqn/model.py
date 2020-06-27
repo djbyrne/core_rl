@@ -26,7 +26,7 @@ from algos.common import wrappers
 from algos.common.agents import ValueAgent
 from algos.common.experience import ExperienceSource, RLDataset
 from algos.common.memory import ReplayBuffer
-from algos.common.networks import CNN, MLP
+from algos.common.networks import CNN
 
 
 class DQNLightning(pl.LightningModule):
@@ -38,7 +38,7 @@ class DQNLightning(pl.LightningModule):
 
         device = torch.device("cuda:0" if self.hparams.gpus > 0 else "cpu")
 
-        self.env = [self.make_env() for _ in range(3)]
+        self.env = [self.make_env() for _ in range(self.hparams.num_envs)]
 
         self.obs_shape = self.env[0].observation_space.shape
         self.n_actions = self.env[0].action_space.n
@@ -62,9 +62,14 @@ class DQNLightning(pl.LightningModule):
             self.reward_list.append(0)
         self.avg_reward = 0
 
-    def make_env(self):
-        env = gym.make(self.hparams.env)
-        # env = wrappers.make_env(self.hparams.env)
+    def make_env(self) -> gym.Env:
+        """
+        Creates a single gym environment
+
+        Returns:
+            gym environment
+        """
+        env = wrappers.make_env(self.hparams.env)
         env.seed(123)
 
         return env
@@ -84,10 +89,8 @@ class DQNLightning(pl.LightningModule):
 
     def build_networks(self) -> None:
         """Initializes the DQN train and target networks"""
-        # self.net = CNN(self.obs_shape, self.n_actions)
-        # self.target_net = CNN(self.obs_shape, self.n_actions)
-        self.net = MLP(self.obs_shape, self.n_actions)
-        self.target_net = MLP(self.obs_shape, self.n_actions)
+        self.net = CNN(self.obs_shape, self.n_actions)
+        self.target_net = CNN(self.obs_shape, self.n_actions)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -153,10 +156,9 @@ class DQNLightning(pl.LightningModule):
         if self.trainer.use_dp or self.trainer.use_ddp2:
             loss = loss.unsqueeze(0)
 
+        # only track the status of the first environment
         if dones[0]:
             self.total_reward = self.episode_reward
-            if self.total_reward == 200:
-                print("COMPLETE! IN %s STEPS", self.global_step)
             self.reward_list.append(self.total_reward)
             self.avg_reward = sum(self.reward_list[-10:]) / 10
             self.episode_count += 1
@@ -245,5 +247,6 @@ class DQNLightning(pl.LightningModule):
         arg_parser.add_argument("--eps_end", type=float, default=0.02, help="final value of epsilon")
         arg_parser.add_argument("--warm_start_steps", type=int, default=10000,
                                 help="max episode reward in the environment")
-
+        arg_parser.add_argument("--num_envs", type=int, default=1,
+                                help="number of environments to use during rollouts")
         return arg_parser

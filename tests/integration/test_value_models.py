@@ -22,7 +22,6 @@ class TestValueModels(TestCase):
             "--warm_start_steps", "100",
             "--episode_length", "100",
             "--gpus", "0",
-            "--env", "CartPole-v0"
         ]
         self.hparams = parent_parser.parse_args(args_list)
 

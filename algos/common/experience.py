@@ -137,11 +137,10 @@ class NStepExperienceSource(ExperienceSource):
 
         for env_idx in range(len(self.env_pool)):
 
-            step_exp, step_reward, step_done = self.single_step(env_idx)
+            _, step_reward, step_done = self.single_step(env_idx)
 
             while len(self.n_step_buffers[env_idx]) < self.n_steps:
-                # FIXME: This should only update the current buffer, not all
-                step_exp, step_reward, step_done = self.single_step(env_idx)
+                _, step_reward, step_done = self.single_step(env_idx)
 
             reward, next_state, done = self.get_transition_info(self.n_step_buffers[env_idx])
             first_experience = self.n_step_buffers[env_idx][0]
@@ -152,8 +151,8 @@ class NStepExperienceSource(ExperienceSource):
                                                next_state)
 
             experiences.append(multi_step_experience)
-            rewards.append(step_exp.reward)
-            dones.append(step_exp.done)
+            rewards.append(step_reward)
+            dones.append(step_done)
 
         return experiences, rewards, dones
 
@@ -177,7 +176,8 @@ class NStepExperienceSource(ExperienceSource):
 
         return experience, reward, done
 
-    def get_transition_info(self, buffer: deque, gamma=0.9) -> Tuple[np.float, np.array, np.int]:
+    @staticmethod
+    def get_transition_info(buffer: deque, gamma=0.9) -> Tuple[np.float, np.array, np.int]:
         """
         get the accumulated transition info for the n_step_buffer
         Args:
@@ -190,7 +190,6 @@ class NStepExperienceSource(ExperienceSource):
         done_index = -1
 
         # check for a terminal state in the buffer
-        # TODO: Refactor for efficiency
         for idx, exp in enumerate(buffer):
             if exp.done:
                 done_index = idx
