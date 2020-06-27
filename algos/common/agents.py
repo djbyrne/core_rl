@@ -20,7 +20,7 @@ def default_states_preprocessor(states: List) -> List[torch.Tensor]:
         np_states = np.expand_dims(states[0], 0)
     else:
         np_states = np.array([np.array(s, copy=False) for s in states], copy=False)
-    return torch.tensor(np_states)
+    return torch.tensor([np_states])
 
 
 class Agent:
@@ -96,7 +96,7 @@ class ValueAgent(Agent):
             torch_state = torch_state.cuda(device)
 
         q_values = self.net(torch_state)
-        _, action = torch.max(q_values, dim=0)
+        _, action = torch.max(q_values, dim=1)
 
         return action.item()
 
