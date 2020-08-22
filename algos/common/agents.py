@@ -1,10 +1,14 @@
-"""Module containing basic type of agents used by the various algorithms"""
+"""
+Agent module containing classes for Agent logic
+
+Based on the implementations found here: https://github.com/Shmuma/ptan/blob/master/ptan/agent.py
+"""
 from random import randint
 
 import numpy as np
 import torch
-from torch import nn
 import torch.nn.functional as F
+from torch import nn
 
 
 class Agent:
@@ -28,8 +32,15 @@ class Agent:
 
 class ValueAgent(Agent):
     """Value based agent that returns an action based on the Q values from the network"""
-    def __init__(self, net: nn.Module, action_space: int, eps_start: float = 1.0,
-                 eps_end: float = 0.2, eps_frames: float = 1000):
+
+    def __init__(
+            self,
+            net: nn.Module,
+            action_space: int,
+            eps_start: float = 1.0,
+            eps_end: float = 0.2,
+            eps_frames: float = 1000,
+    ):
         super().__init__(net)
         self.action_space = action_space
         self.eps_start = eps_start
@@ -72,14 +83,11 @@ class ValueAgent(Agent):
                 action defined by Q values
         """
         if not isinstance(state, torch.Tensor):
-            state = torch.tensor([state])
-
-        if device.type != 'cpu':
-            state = state.cuda(device)
+            state = torch.tensor([state], device=device)
 
         q_values = self.net(state)
         _, action = torch.max(q_values, dim=1)
-        return int(action.item())
+        return int(action.detach().item())
 
     def update_epsilon(self, step: int) -> None:
         """
@@ -105,7 +113,7 @@ class PolicyAgent(Agent):
         Returns:
             action defined by policy
         """
-        if device.type != 'cpu':
+        if device.type != "cpu":
             state = state.cuda(device)
 
         # get the logits and pass through softmax for probability distribution

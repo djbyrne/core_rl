@@ -11,45 +11,25 @@ see the metrics:
 tensorboard --logdir default
 """
 import argparse
+import pytorch_lightning as pl
 
-import torch
+from algos.common import cli
+from algos.dqn.model import DQN
 
-from algos.common import wrappers
-from algos.common.agents import ValueAgent
-from algos.common.experience import NStepExperienceSource
-from algos.common.memory import ReplayBuffer
-from algos.dqn.model import DQNLightning
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(add_help=False)
 
-class NStepDQNLightning(DQNLightning):
-    """ NStep DQN Model """
+    # trainer args
+    parser = pl.Trainer.add_argparse_args(parser)
 
-    def __init__(self, hparams: argparse.Namespace) -> None:
-        super().__init__(hparams)
-        self.hparams = hparams
+    # model args
+    parser = cli.add_base_args(parser)
+    parser = DQN.add_model_specific_args(parser)
+    args = parser.parse_args()
 
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    #  set the dqn n_steps to your chosen value
+    args.n_steps = 4
+    model = DQN(**args.__dict__)
 
-        self.env = wrappers.make_env(self.hparams.env)
-        self.env.seed(123)
-
-        self.obs_shape = self.env.observation_space.shape
-        self.n_actions = self.env.action_space.n
-
-        self.net = None
-        self.target_net = None
-        self.build_networks()
-
-        self.agent = ValueAgent(self.net, self.n_actions, eps_start=hparams.eps_start,
-                                eps_end=hparams.eps_end, eps_frames=hparams.eps_last_frame)
-        self.source = NStepExperienceSource(self.env, self.agent, device, n_steps=self.hparams.n_steps)
-        self.buffer = ReplayBuffer(self.hparams.replay_size)
-
-        self.total_reward = 0
-        self.episode_reward = 0
-        self.episode_count = 0
-        self.episode_steps = 0
-        self.total_episode_steps = 0
-        self.reward_list = []
-        for _ in range(100):
-            self.reward_list.append(-21)
-        self.avg_reward = 0
+    trainer = pl.Trainer.from_argparse_args(args)
+    trainer.fit(model)

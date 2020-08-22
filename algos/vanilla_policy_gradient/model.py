@@ -1,45 +1,65 @@
 """
-Deep Reinforcement Learning: Deep Q-network (DQN)
-This example is based on https://github.com/PacktPublishing/Deep-Reinforcement-Learning-Hands-On-
-Second-Edition/blob/master/Chapter06/02_dqn_pong.py
-The template illustrates using Lightning for Reinforcement Learning. The example builds a basic DQN using the
-classic CartPole environment.
-To run the template just run:
-python reinforce_learn_Qnet.py
-After ~1500 steps, you will see the total_reward hitting the max score of 200. Open up TensorBoard to
-see the metrics:
-tensorboard --logdir default
+Vanilla Policy Gradient
+
 """
-from copy import deepcopy
-from itertools import chain
-from typing import Tuple, List
 import argparse
 from collections import OrderedDict
+from copy import deepcopy
+from typing import Tuple, List
 
-import torch
-from torch import Tensor
-import torch.optim as optim
-from torch.nn.functional import log_softmax, softmax
-from torch.optim import Optimizer
-from torch.utils.data import DataLoader
-import pytorch_lightning as pl
 import gym
+import pytorch_lightning as pl
+import torch
+import torch.optim as optim
+from torch import Tensor
+from torch.nn.functional import log_softmax, softmax
+from torch.optim.optimizer import Optimizer
+from torch.utils.data import DataLoader
+
+from algos.common import cli
 from algos.common.agents import PolicyAgent
-from algos.common.experience import EpisodicExperienceStream
-from algos.common.memory import Experience
 from algos.common.networks import MLP
 from algos.common.wrappers import ToTensor
+from datamodules.experience_source import ExperienceSourceDataset, NStepExperienceSource
 
 
-class VPGLightning(pl.LightningModule):
-    """ VPG Model """
+class PolicyGradient(pl.LightningModule):
+    """ Vanilla Policy Gradient Model """
 
-    def __init__(self, hparams: argparse.Namespace) -> None:
+    def __init__(self, env: str, gamma: float = 0.99, lr: float = 1e-4, batch_size: int = 32,
+                 entropy_beta: float = 0.01, batch_episodes: int = 4, avg_reward_len=100, *args, **kwargs) -> None:
+        """
+        PyTorch Lightning implementation of `Vanilla Policy Gradient
+        <https://papers.nips.cc/paper/
+        1713-policy-gradient-methods-for-reinforcement-learning-with-function-approximation.pdf>`_
+
+        Paper authors: Richard S. Sutton, David McAllester, Satinder Singh, Yishay Mansour
+
+        Model implemented by:
+
+            - `Donal Byrne <https://github.com/djbyrne>`
+
+        Args:
+            env: gym environment tag
+            gamma: discount factor
+            lr: learning rate
+            batch_size: size of minibatch pulled from the DataLoader
+            batch_episodes: how many episodes to rollout for each batch of training
+            entropy_beta: dictates the level of entropy per batch
+            avg_reward_len: how many episodes to take into account when calculating the avg reward
+
+        .. note::
+            This example is based on:
+             https://github.com/PacktPublishing/Deep-Reinforcement-Learning-Hands-On-Second-Edition\
+             /blob/master/Chapter11/04_cartpole_pg.py
+
+        .. note:: Currently only supports CPU and single GPU training with `distributed_backend=dp`
+
+        """
         super().__init__()
-        self.hparams = hparams
 
         # self.env = wrappers.make_env(self.hparams.env)    # use for Atari
-        self.env = ToTensor(gym.make(self.hparams.env))     # use for Box2D/Control
+        self.env = ToTensor(gym.make(env))  # use for Box2D/Control
         self.env.seed(123)
 
         self.obs_shape = self.env.observation_space.shape
@@ -49,17 +69,27 @@ class VPGLightning(pl.LightningModule):
         self.build_networks()
 
         self.agent = PolicyAgent(self.net)
+        self.source = NStepExperienceSource(env=self.env, agent=self.agent, n_steps=10)
 
+        self.gamma = gamma
+        self.lr = lr
+        self.batch_size = batch_size
+        self.batch_episodes = batch_episodes
+        self.entropy_beta = entropy_beta
+        self.baseline = 0
+
+        # Metrics
+
+        self.reward_sum = 0
+        self.env_steps = 0
+        self.total_steps = 0
         self.total_reward = 0
-        self.episode_reward = 0
         self.episode_count = 0
-        self.episode_steps = 0
-        self.total_episode_steps = 0
-        self.entropy_beta = self.hparams.entropy_beta
+        self.avg_reward_len = avg_reward_len
 
         self.reward_list = []
-        for _ in range(100):
-            self.reward_list.append(0)
+        for _ in range(avg_reward_len):
+            self.reward_list.append(torch.tensor(0, device=self.device))
         self.avg_reward = 0
 
     def build_networks(self) -> None:
@@ -92,7 +122,7 @@ class VPGLightning(pl.LightningModule):
         res = []
         sum_r = 0.0
         for reward in reversed(rewards):
-            sum_r *= self.hparams.gamma
+            sum_r *= self.gamma
             sum_r += reward
             res.append(deepcopy(sum_r))
         res = list(reversed(res))
@@ -103,81 +133,18 @@ class VPGLightning(pl.LightningModule):
         mean_q = sum_q / len(res)
         return [q - mean_q for q in res]
 
-    def process_batch(self, batch: List[List[Experience]]) -> Tuple[List[Tensor], List[Tensor], List[Tensor]]:
-        """
-        Takes in a batch of episodes and retrieves the q vals, the states and the actions for the batch
-
-        Args:
-            batch: list of episodes, each containing a list of Experiences
-
-        Returns:
-            q_vals, states and actions used for calculating the loss
-        """
-        # get outputs for each episode
-        batch_rewards, batch_states, batch_actions = [], [], []
-        for episode in batch:
-            ep_rewards, ep_states, ep_actions = [], [], []
-
-            # log the outputs for each step
-            for step in episode:
-                ep_rewards.append(step[2].float())
-                ep_states.append(step[0])
-                ep_actions.append(step[1])
-
-            # add episode outputs to the batch
-            batch_rewards.append(ep_rewards)
-            batch_states.append(ep_states)
-            batch_actions.append(ep_actions)
-
-        # get qvals
-        batch_qvals = []
-        for reward in batch_rewards:
-            batch_qvals.append(self.calc_qvals(reward))
-
-        # flatten the batched outputs
-        batch_actions, batch_qvals, batch_rewards, batch_states = self.flatten_batch(batch_actions, batch_qvals,
-                                                                                     batch_rewards, batch_states)
-
-        return batch_qvals, batch_states, batch_actions, batch_rewards
-
-    @staticmethod
-    def flatten_batch(batch_actions: List[List[Tensor]], batch_qvals: List[List[Tensor]],
-                      batch_rewards: List[List[Tensor]], batch_states: List[List[Tuple[Tensor, Tensor]]]) \
-            -> Tuple[Tensor, Tensor, Tensor, Tensor]:
-        """
-        Takes in the outputs of the processed batch and flattens the several episodes into a single tensor for each
-        batched output
-
-        Args:
-            batch_actions: actions taken in each batch episodes
-            batch_qvals: Q vals for each batch episode
-            batch_rewards: reward for each batch episode
-            batch_states: states for each batch episodes
-
-        Returns:
-            The input batched results flattend into a single tensor
-        """
-        # flatten all episode steps into a single list
-        batch_qvals = list(chain.from_iterable(batch_qvals))
-        batch_states = list(chain.from_iterable(batch_states))
-        batch_actions = list(chain.from_iterable(batch_actions))
-        batch_rewards = list(chain.from_iterable(batch_rewards))
-
-        # stack steps into single tensor and remove extra dimension
-        batch_qvals = torch.stack(batch_qvals).squeeze()
-        batch_states = torch.stack(batch_states).squeeze()
-        batch_actions = torch.stack(batch_actions).squeeze()
-        batch_rewards = torch.stack(batch_rewards).squeeze()
-
-        return batch_actions, batch_qvals, batch_rewards, batch_states
-
-    def loss(self, batch_qvals: List[Tensor], batch_states: List[Tensor], batch_actions: List[Tensor]) -> torch.Tensor:
+    def loss(
+        self,
+        batch_scales: List[Tensor],
+        batch_states: List[Tensor],
+        batch_actions: List[Tensor],
+    ) -> torch.Tensor:
         """
         Calculates the mse loss using a batch of states, actions and Q values from several episodes. These have all
         been flattend into a single tensor.
 
         Args:
-            batch_qvals: current mini batch of q values
+            batch_scales: current mini batch of rewards minus the baseline
             batch_actions: current batch of actions
             batch_states: current batch of states
 
@@ -186,7 +153,9 @@ class VPGLightning(pl.LightningModule):
         """
         logits = self.net(batch_states)
 
-        log_prob, policy_loss = self.calc_policy_loss(batch_actions, batch_qvals, batch_states, logits)
+        log_prob, policy_loss = self.calc_policy_loss(
+            batch_actions, batch_scales, batch_states, logits
+        )
 
         entropy_loss_v = self.calc_entropy_loss(log_prob, logits)
 
@@ -210,8 +179,9 @@ class VPGLightning(pl.LightningModule):
         return entropy_loss_v
 
     @staticmethod
-    def calc_policy_loss(batch_actions: Tensor, batch_qvals: Tensor,
-                         batch_states: Tensor, logits: Tensor) -> Tuple[List, Tensor]:
+    def calc_policy_loss(
+        batch_actions: Tensor, batch_qvals: Tensor, batch_states: Tensor, logits: Tensor
+    ) -> Tuple[List, Tensor]:
         """
         Calculate the policy loss give the batch outputs and logits
         Args:
@@ -224,9 +194,47 @@ class VPGLightning(pl.LightningModule):
             policy loss
         """
         log_prob = log_softmax(logits, dim=1)
-        log_prob_actions = batch_qvals * log_prob[range(len(batch_states)), batch_actions]
+        log_prob_actions = (
+            batch_qvals * log_prob[range(len(batch_states)), batch_actions]
+        )
         policy_loss = -log_prob_actions.mean()
         return log_prob, policy_loss
+
+    def train_batch(self) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[torch.Tensor]]:
+        """
+        Contains the logic for generating a new batch of data to be passed to the DataLoader
+
+        Returns:
+            yields a tuple of Lists containing tensors for states, actions and rewards of the batch.
+        """
+
+        for _ in range(self.batch_size):
+
+            # take a step in the env
+            exp, reward, done = self.source.step(self.device)
+            self.env_steps += 1
+            self.total_steps += 1
+
+            # update the baseline
+            self.reward_sum += exp.reward
+            self.baseline = self.reward_sum / self.total_steps
+            self.total_reward += reward
+
+            # gather the experience data
+            scale = exp.reward - self.baseline
+            yield exp.new_state, exp.action, scale
+
+            if done:
+                # tracking metrics
+                self.episode_count += 1
+                self.reward_list.append(self.total_reward)
+                self.avg_reward = sum(self.reward_list[-self.avg_reward_len:]) / self.avg_reward_len
+
+                self.logger.experiment.add_scalar("reward", self.total_reward, self.total_steps)
+
+                # reset metrics
+                self.total_reward = 0
+                self.env_steps = 0
 
     def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor], _) -> OrderedDict:
         """
@@ -240,46 +248,38 @@ class VPGLightning(pl.LightningModule):
         Returns:
             Training loss and log metrics
         """
-        device = self.get_device(batch)
-
-        batch_qvals, batch_states, batch_actions, batch_rewards = self.process_batch(batch)
-
-        # get avg reward over the batched episodes
-        self.episode_reward = sum(batch_rewards) / len(batch)
-        self.reward_list.append(self.episode_reward)
-        self.avg_reward = sum(self.reward_list) / len(self.reward_list)
+        states, actions, scales = batch
 
         # calculates training loss
-        loss = self.loss(batch_qvals, batch_states, batch_actions)
+        loss = self.loss(scales, states, actions)
 
         if self.trainer.use_dp or self.trainer.use_ddp2:
             loss = loss.unsqueeze(0)
 
-        self.episode_count += self.hparams.batch_episodes
+        log = {
+            "train_loss": loss,
+            "avg_reward": self.avg_reward,
+            "episode_count": self.episode_count,
+            "baseline": self.baseline
+        }
 
-        log = {'episode_reward': torch.tensor(self.episode_reward).to(device),
-               'train_loss': loss,
-               'avg_reward': self.avg_reward
-               }
-        status = {'steps': torch.tensor(self.global_step).to(device),
-                  'episode_reward': torch.tensor(self.episode_reward).to(device),
-                  'episodes': torch.tensor(self.episode_count),
-                  'avg_reward': self.avg_reward
-                  }
-
-        self.episode_reward = 0
-
-        return OrderedDict({'loss': loss, 'reward': self.avg_reward, 'log': log, 'progress_bar': status})
+        return OrderedDict(
+            {
+                "loss": loss,
+                "log": log,
+                "progress_bar": log
+            }
+        )
 
     def configure_optimizers(self) -> List[Optimizer]:
         """ Initialize Adam optimizer"""
-        optimizer = optim.Adam(self.net.parameters(), lr=self.hparams.lr)
+        optimizer = optim.Adam(self.net.parameters(), lr=self.lr)
         return [optimizer]
 
     def _dataloader(self) -> DataLoader:
         """Initialize the Replay Buffer dataset used for retrieving experiences"""
-        dataset = EpisodicExperienceStream(self.env, self.agent, self.device, episodes=self.hparams.batch_episodes)
-        dataloader = DataLoader(dataset=dataset)
+        dataset = ExperienceSourceDataset(self.train_batch)
+        dataloader = DataLoader(dataset=dataset, batch_size=self.batch_size)
         return dataloader
 
     def train_dataloader(self) -> DataLoader:
@@ -288,7 +288,7 @@ class VPGLightning(pl.LightningModule):
 
     def get_device(self, batch) -> str:
         """Retrieve device currently being used by minibatch"""
-        return batch[0][0][0].device.index if self.on_gpu else 'cpu'
+        return batch[0][0][0].device.index if self.on_gpu else "cpu"
 
     @staticmethod
     def add_model_specific_args(arg_parser) -> argparse.ArgumentParser:
@@ -300,8 +300,31 @@ class VPGLightning(pl.LightningModule):
         Args:
             parent
         """
-        arg_parser.add_argument("--batch_episodes", type=int, default=4,
-                                help="how episodes to run per batch")
-        arg_parser.add_argument("--entropy_beta", type=int, default=0.01,
-                                help="entropy beta")
+        arg_parser.add_argument(
+            "--batch_episodes",
+            type=int,
+            default=4,
+            help="how episodes to run per batch",
+        )
+        arg_parser.add_argument(
+            "--entropy_beta", type=int, default=0.01, help="entropy beta"
+        )
         return arg_parser
+
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(add_help=False)
+
+    # trainer args
+    parser = pl.Trainer.add_argparse_args(parser)
+
+    # model args
+    parser = cli.add_base_args(parser)
+    parser = PolicyGradient.add_model_specific_args(parser)
+    args = parser.parse_args()
+
+    model = PolicyGradient(**args.__dict__)
+
+    trainer = pl.Trainer.from_argparse_args(args)
+    trainer.fit(model)

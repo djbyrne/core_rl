@@ -1,16 +1,11 @@
 import argparse
 from unittest import TestCase
+
 import pytorch_lightning as pl
 
 from algos.common import cli
-from algos.double_dqn.model import DoubleDQNLightning
-from algos.dqn.model import DQNLightning
-from algos.dueling_dqn.model import DuelingDQNLightning
-from algos.n_step_dqn.model import NStepDQNLightning
-from algos.noisy_dqn.model import NoisyDQNLightning
-from algos.per_dqn.model import PERDQNLightning
-from algos.reinforce.model import ReinforceLightning
-from algos.vanilla_policy_gradient.model import VPGLightning
+from algos.reinforce.model import Reinforce
+from algos.vanilla_policy_gradient.model import PolicyGradient
 
 
 class TestPolicyModels(TestCase):
@@ -18,9 +13,9 @@ class TestPolicyModels(TestCase):
     def setUp(self) -> None:
         parent_parser = argparse.ArgumentParser(add_help=False)
         parent_parser = cli.add_base_args(parent=parent_parser)
-        parent_parser = VPGLightning.add_model_specific_args(parent_parser)
+        parent_parser = PolicyGradient.add_model_specific_args(parent_parser)
         args_list = [
-            "--algo", "vpg",
+            "--algo", "PolicyGradient",
             "--episode_length", "100",
             "--env", "CartPole-v0"
         ]
@@ -30,19 +25,20 @@ class TestPolicyModels(TestCase):
             gpus=0,
             max_steps=100,
             max_epochs=100,  # Set this as the same as max steps to ensure that it doesn't stop early
-            val_check_interval=1000  # This just needs 'some' value, does not effect training right now
+            fast_dev_run=True
         )
 
     def test_reinforce(self):
-        """Smoke test that the DQN model runs"""
-        model = ReinforceLightning(self.hparams)
+        """Smoke test that the reinforce model runs"""
+
+        model = Reinforce(self.hparams.env)
         result = self.trainer.fit(model)
 
         self.assertEqual(result, 1)
 
-    def test_vpg(self):
-        """Smoke test that the Double DQN model runs"""
-        model = VPGLightning(self.hparams)
+    def test_PolicyGradient(self):
+        """Smoke test that the policy gradient model runs"""
+        model = PolicyGradient(self.hparams.env)
         result = self.trainer.fit(model)
 
         self.assertEqual(result, 1)

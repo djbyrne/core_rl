@@ -1,10 +1,13 @@
-"""Series of networks used"""
+"""Series of networks used
+Based on implementations found here:
+"""
 import math
 from typing import Tuple
+
 import numpy as np
 import torch
-from torch import nn
 from torch import Tensor
+from torch import nn
 from torch.nn import functional as F
 
 
@@ -16,6 +19,7 @@ class CNN(nn.Module):
         input_shape: observation shape of the environment
         n_actions: number of discrete actions available in the environment
     """
+
     def __init__(self, input_shape, n_actions):
         super(CNN, self).__init__()
 
@@ -25,14 +29,12 @@ class CNN(nn.Module):
             nn.Conv2d(32, 64, kernel_size=4, stride=2),
             nn.ReLU(),
             nn.Conv2d(64, 64, kernel_size=3, stride=1),
-            nn.ReLU()
+            nn.ReLU(),
         )
 
         conv_out_size = self._get_conv_out(input_shape)
         self.head = nn.Sequential(
-            nn.Linear(conv_out_size, 512),
-            nn.ReLU(),
-            nn.Linear(512, n_actions)
+            nn.Linear(conv_out_size, 512), nn.ReLU(), nn.Linear(512, n_actions)
         )
 
     def _get_conv_out(self, shape) -> int:
@@ -77,7 +79,7 @@ class MLP(nn.Module):
         self.net = nn.Sequential(
             nn.Linear(input_shape[0], hidden_size),
             nn.ReLU(),
-            nn.Linear(hidden_size, n_actions)
+            nn.Linear(hidden_size, n_actions),
         )
 
     def forward(self, input_x):
@@ -109,18 +111,16 @@ class DuelingMLP(nn.Module):
         self.net = nn.Sequential(
             nn.Linear(input_shape[0], hidden_size),
             nn.ReLU(),
-            nn.Linear(hidden_size, hidden_size)
+            nn.Linear(hidden_size, hidden_size),
         )
 
         self.head_adv = nn.Sequential(
             nn.Linear(hidden_size, hidden_size),
             nn.ReLU(),
-            nn.Linear(hidden_size, n_actions)
+            nn.Linear(hidden_size, n_actions),
         )
         self.head_val = nn.Sequential(
-            nn.Linear(hidden_size, 256),
-            nn.ReLU(),
-            nn.Linear(256, 1)
+            nn.Linear(hidden_size, 256), nn.ReLU(), nn.Linear(256, 1)
         )
 
     def forward(self, input_x):
@@ -173,23 +173,19 @@ class DuelingCNN(nn.Module):
             nn.Conv2d(32, 64, kernel_size=4, stride=2),
             nn.ReLU(),
             nn.Conv2d(64, 64, kernel_size=3, stride=1),
-            nn.ReLU()
+            nn.ReLU(),
         )
 
         conv_out_size = self._get_conv_out(input_shape)
 
         # advantage head
         self.head_adv = nn.Sequential(
-            nn.Linear(conv_out_size, 256),
-            nn.ReLU(),
-            nn.Linear(256, n_actions)
+            nn.Linear(conv_out_size, 256), nn.ReLU(), nn.Linear(256, n_actions)
         )
 
         # value head
         self.head_val = nn.Sequential(
-            nn.Linear(conv_out_size, 256),
-            nn.ReLU(),
-            nn.Linear(256, 1)
+            nn.Linear(conv_out_size, 256), nn.ReLU(), nn.Linear(256, 1)
         )
 
     def _get_conv_out(self, shape) -> int:
@@ -243,6 +239,7 @@ class NoisyCNN(nn.Module):
         input_shape: observation shape of the environment
         n_actions: number of discrete actions available in the environment
     """
+
     def __init__(self, input_shape, n_actions):
         super().__init__()
 
@@ -252,14 +249,12 @@ class NoisyCNN(nn.Module):
             nn.Conv2d(32, 64, kernel_size=4, stride=2),
             nn.ReLU(),
             nn.Conv2d(64, 64, kernel_size=3, stride=1),
-            nn.ReLU()
+            nn.ReLU(),
         )
 
         conv_out_size = self._get_conv_out(input_shape)
         self.head = nn.Sequential(
-            NoisyLinear(conv_out_size, 512),
-            nn.ReLU(),
-            NoisyLinear(512, n_actions)
+            NoisyLinear(conv_out_size, 512), nn.ReLU(), NoisyLinear(512, n_actions)
         )
 
     def _get_conv_out(self, shape) -> int:
@@ -289,13 +284,53 @@ class NoisyCNN(nn.Module):
         return self.head(conv_out)
 
 
+class CNNActorCritic(nn.Module):
+    def __init__(self, input_shape, n_actions):
+        super().__init__()
+
+        self.conv = nn.Sequential(
+            nn.Conv2d(input_shape[0], 32, kernel_size=8, stride=4),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1),
+            nn.ReLU()
+        )
+
+        conv_out_size = self._get_conv_out(input_shape)
+        self.policy = nn.Sequential(
+            nn.Linear(conv_out_size, 512),
+            nn.ReLU(),
+            nn.Linear(512, n_actions)
+        )
+
+        self.value = nn.Sequential(
+            nn.Linear(conv_out_size, 512),
+            nn.ReLU(),
+            nn.Linear(512, 1)
+        )
+
+    def _get_conv_out(self, shape):
+        o = self.conv(torch.zeros(1, *shape))
+        return int(np.prod(o.size()))
+
+    def forward(self, x):
+        fx = x.float() / 256
+        conv_out = self.conv(fx).view(fx.size()[0], -1)
+        return self.policy(conv_out), self.value(conv_out)
+
+
 ###################
 #  Custom Layers  #
 ###################
 
+
 class NoisyLinear(nn.Linear):
     """
     Noisy Layer using Independent Gaussian Noise.
+
+    based on https://github.com/PacktPublishing/Deep-Reinforcement-Learning-Hands-On-Second-Edition/blob/master/
+    Chapter08/lib/dqn_extra.py#L19
 
     Args:
         in_features: number of inputs
@@ -304,10 +339,8 @@ class NoisyLinear(nn.Linear):
         bias: flag to include bias to linear layer
     """
 
-    def __init__(self, in_features, out_features,
-                 sigma_init=0.017, bias=True):
-        super(NoisyLinear, self).__init__(
-            in_features, out_features, bias=bias)
+    def __init__(self, in_features, out_features, sigma_init=0.017, bias=True):
+        super(NoisyLinear, self).__init__(in_features, out_features, bias=bias)
 
         weights = torch.full((out_features, in_features), sigma_init)
         self.sigma_weight = nn.Parameter(weights)

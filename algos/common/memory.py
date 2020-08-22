@@ -2,15 +2,15 @@
 
 # Named tuple for storing experience steps gathered in training
 import collections
-from typing import Tuple, List, Union
+import warnings
 from collections import deque, namedtuple
+from typing import Tuple, List, Union
 
 import numpy as np
 
-
 Experience = namedtuple(
-    'Experience', field_names=['state', 'action', 'reward',
-                               'done', 'new_state'])
+    "Experience", field_names=["state", "action", "reward", "done", "new_state"]
+)
 
 
 class Buffer:
@@ -20,6 +20,7 @@ class Buffer:
     Args:
         capacity: size of the buffer
     """
+
     def __init__(self, capacity: int) -> None:
         self.buffer = deque(maxlen=capacity)
 
@@ -43,12 +44,19 @@ class Buffer:
         Returns:
             a batch of tuple np arrays of state, action, reward, done, next_state
         """
-        states, actions, rewards, dones, next_states = zip(*[self.buffer[idx] for idx in range(self.__len__())])
+        states, actions, rewards, dones, next_states = zip(
+            *[self.buffer[idx] for idx in range(self.__len__())]
+        )
 
         self.buffer.clear()
 
-        return (np.array(states), np.array(actions), np.array(rewards, dtype=np.float32),
-                np.array(dones, dtype=np.bool), np.array(next_states))
+        return (
+            np.array(states),
+            np.array(actions),
+            np.array(rewards, dtype=np.float32),
+            np.array(dones, dtype=np.bool),
+            np.array(next_states),
+        )
 
 
 class ReplayBuffer(Buffer):
@@ -70,10 +78,17 @@ class ReplayBuffer(Buffer):
         """
 
         indices = np.random.choice(len(self.buffer), batch_size, replace=False)
-        states, actions, rewards, dones, next_states = zip(*[self.buffer[idx] for idx in indices])
+        states, actions, rewards, dones, next_states = zip(
+            *[self.buffer[idx] for idx in indices]
+        )
 
-        return (np.array(states), np.array(actions), np.array(rewards, dtype=np.float32),
-                np.array(dones, dtype=np.bool), np.array(next_states))
+        return (
+            np.array(states),
+            np.array(actions),
+            np.array(rewards, dtype=np.float32),
+            np.array(dones, dtype=np.bool),
+            np.array(next_states),
+        )
 
 
 class MultiStepBuffer:
@@ -82,7 +97,13 @@ class MultiStepBuffer:
 
     Deprecated: use the NStepExperienceSource with the standard ReplayBuffer
     """
+
     def __init__(self, buffer_size, n_step=2):
+        warnings.warn(
+            "Deprecated, this so no longer be used. Instead use the DiscountedExperienceSource with the "
+            "standard replay buffer.",
+            DeprecationWarning,
+        )
         self.n_step = n_step
         self.buffer = deque(maxlen=buffer_size)
         self.n_step_buffer = deque(maxlen=n_step)
@@ -126,11 +147,13 @@ class MultiStepBuffer:
         if len(self.n_step_buffer) >= self.n_step:
             reward, next_state, done = self.get_transition_info()
             first_experience = self.n_step_buffer[0]
-            multi_step_experience = Experience(first_experience.state,
-                                               first_experience.action,
-                                               reward,
-                                               done,
-                                               next_state)
+            multi_step_experience = Experience(
+                first_experience.state,
+                first_experience.action,
+                reward,
+                done,
+                next_state,
+            )
 
             self.buffer.append(multi_step_experience)
 
@@ -145,18 +168,26 @@ class MultiStepBuffer:
         # pylint: disable=no-else-return
         if len(self.buffer) >= batch_size:
             indices = np.random.choice(len(self.buffer), batch_size, replace=False)
-            states, actions, rewards, dones, next_states = zip(*[self.buffer[idx] for idx in indices])
+            states, actions, rewards, dones, next_states = zip(
+                *[self.buffer[idx] for idx in indices]
+            )
 
-            return (np.array(states), np.array(actions), np.array(rewards, dtype=np.float32),
-                    np.array(dones, dtype=np.bool), np.array(next_states))
+            return (
+                np.array(states),
+                np.array(actions),
+                np.array(rewards, dtype=np.float32),
+                np.array(dones, dtype=np.bool),
+                np.array(next_states),
+            )
         else:
-            raise Exception('Buffer length is less than the batch size')
+            raise Exception("Buffer length is less than the batch size")
 
 
 class MeanBuffer:
     """
     Stores a deque of items and calculates the mean
     """
+
     def __init__(self, capacity):
         self.capacity = capacity
         self.deque = collections.deque(maxlen=capacity)
@@ -177,7 +208,11 @@ class MeanBuffer:
 
 
 class PERBuffer(ReplayBuffer):
-    """simple list based Prioritized Experience Replay Buffer"""
+    """
+    simple list based Prioritized Experience Replay Buffer
+    Based on implementation found here:
+    https://github.com/Shmuma/ptan/blob/master/ptan/experience.py#L371
+    """
 
     def __init__(self, buffer_size, prob_alpha=0.6, beta_start=0.4, beta_frames=100000):
         super().__init__(capacity=buffer_size)
@@ -240,7 +275,7 @@ class PERBuffer(ReplayBuffer):
         if len(self.buffer) == self.capacity:
             prios = self.priorities
         else:
-            prios = self.priorities[:self.pos]
+            prios = self.priorities[: self.pos]
 
         # probability to the power of alpha to weight how important that probability it, 0 = normal distirbution
         probs = prios ** self.prob_alpha
@@ -249,10 +284,17 @@ class PERBuffer(ReplayBuffer):
         # choise sample of indices based on the priority prob distribution
         indices = np.random.choice(len(self.buffer), batch_size, p=probs)
         # samples = [self.buffer[idx] for idx in indices]
-        states, actions, rewards, dones, next_states = zip(*[self.buffer[idx] for idx in indices])
+        states, actions, rewards, dones, next_states = zip(
+            *[self.buffer[idx] for idx in indices]
+        )
 
-        samples = (np.array(states), np.array(actions), np.array(rewards, dtype=np.float32),
-                   np.array(dones, dtype=np.bool), np.array(next_states))
+        samples = (
+            np.array(states),
+            np.array(actions),
+            np.array(rewards, dtype=np.float32),
+            np.array(dones, dtype=np.bool),
+            np.array(next_states),
+        )
         total = len(self.buffer)
 
         # weight of each sample datum to compensate for the bias added in with prioritising samples
@@ -273,127 +315,3 @@ class PERBuffer(ReplayBuffer):
         """
         for idx, prio in zip(batch_indices, batch_priorities):
             self.priorities[idx] = prio
-
-#
-# class SumTree:
-#     write = 0
-#
-#     def __init__(self, capacity):
-#         self.capacity = capacity
-#         self.tree = np.zeros(2 * capacity - 1)
-#         self.data = np.zeros(capacity, dtype=object)
-#         self.n_entries = 0
-#
-#     # update to the root node
-#     def _propagate(self, idx, change):
-#         parent = (idx - 1) // 2
-#
-#         self.tree[parent] += int(change)
-#
-#         if parent != 0:
-#             self._propagate(parent, change)
-#
-#     # find sample on leaf node
-#     def _retrieve(self, idx, s):
-#         left = 2 * idx + 1
-#         right = left + 1
-#
-#         if left >= len(self.tree):
-#             return idx
-#
-#         if s <= self.tree[left]:
-#             return self._retrieve(left, s)
-#         else:
-#             return self._retrieve(right, s - self.tree[left])
-#
-#     def total(self):
-#         return self.tree[0]
-#
-#     # store priority and sample
-#     def add(self, p, data):
-#         idx = self.write + self.capacity - 1
-#
-#         self.data[self.write] = data
-#         self.update(idx, p)
-#
-#         self.write += 1
-#         if self.write >= self.capacity:
-#             self.write = 0
-#
-#         if self.n_entries < self.capacity:
-#             self.n_entries += 1
-#
-#     # update priority
-#     def update(self, idx, p):
-#         change = p - self.tree[idx]
-#
-#         self.tree[idx] = p
-#
-#         if isinstance(idx, int):
-#             self._propagate(idx, change)
-#         else:
-#             for index, node in enumerate(idx):
-#                 self._propagate(node, change[index])
-#
-#     # get priority and sample
-#     def get(self, s):
-#         idx = self._retrieve(0, s)
-#         dataIdx = idx - self.capacity + 1
-#
-#         return (idx, self.tree[idx], self.data[dataIdx])
-#
-#
-# class SumTreeBuffer:  # stored as ( s, a, r, s_ ) in SumTree
-#     e = 0.01
-#     a = 0.6
-#     beta = 0.4
-#     beta_increment_per_sampling = 0.001
-#
-#     def __init__(self, capacity):
-#         self.tree = SumTree(capacity)
-#         self.capacity = capacity
-#         self.step = 0
-#         self.beta_start = 0.4
-#         self.beta_frames = 100000
-#
-#     def _get_priority(self, error):
-#         return (np.abs(error)) ** self.a
-#
-#     def append(self, sample):
-#         # p = self._get_priority(error)
-#         p = 1.0
-#         self.tree.add(p, sample)
-#
-#     def sample(self, n):
-#         self.step += 1
-#         batch = []
-#         idxs = []
-#         segment = self.tree.total() / n
-#         priorities = []
-#
-#         # self.beta = np.min([1., self.beta + self.beta_increment_per_sampling])
-#         beta_val = self.beta_start + self.step * (1.0 - self.beta_start) / self.beta_frames
-#         self.beta = min(1.0, beta_val)
-#
-#         for i in range(n):
-#             a = segment * i
-#             b = segment * (i + 1)
-#
-#             s = random.uniform(a, b)
-#             (idx, p, data) = self.tree.get(s)
-#             priorities.append(p)
-#             sample = (np.array(data.state), np.array(data.action), np.array(data.reward, dtype=np.float32),
-#                       np.array(data.done, dtype=np.bool), np.array(data.new_state))
-#             batch.append(sample)
-#             idxs.append(idx)
-#
-#         sampling_probabilities = priorities / self.tree.total()
-#         is_weight = np.power(self.tree.n_entries * sampling_probabilities, -self.beta)
-#         is_weight /= is_weight.max()
-#
-#         return batch, idxs, is_weight
-#
-#     def update_priorities(self, idx, error):
-#         p = self._get_priority(error)
-#         self.tree.update(idx, p)
-#

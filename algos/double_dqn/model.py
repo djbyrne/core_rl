@@ -1,60 +1,137 @@
 """
-Deep Reinforcement Learning: Deep Q-network (DQN)
-This example is based on https://github.com/PacktPublishing/Deep-Reinforcement-Learning-Hands-On-
-Second-Edition/blob/master/Chapter06/02_dqn_pong.py
-The template illustrates using Lightning for Reinforcement Learning. The example builds a basic DQN using the
-classic CartPole environment.
-To run the template just run:
-python reinforce_learn_Qnet.py
-After ~1500 steps, you will see the total_reward hitting the max score of 200. Open up TensorBoard to
-see the metrics:
-tensorboard --logdir default
+Double DQN
 """
-
+import argparse
+from collections import OrderedDict
 from typing import Tuple
+
+import pytorch_lightning as pl
 import torch
-import torch.nn as nn
-from algos.dqn.model import DQNLightning
+
+from algos.common import cli
+from algos.dqn.model import DQN
+from losses.loss import double_dqn_loss
 
 
-class DoubleDQNLightning(DQNLightning):
-    """ Double DQN Model """
+class DoubleDQN(DQN):
+    """
+    Double Deep Q-network (DDQN)
+    PyTorch Lightning implementation of `Double DQN <https://arxiv.org/pdf/1509.06461.pdf>`_
 
-    def loss(self, batch: Tuple[torch.Tensor, torch.Tensor]) -> torch.Tensor:
+    Paper authors: Hado van Hasselt, Arthur Guez, David Silver
+
+    Model implemented by:
+
+        - `Donal Byrne <https://github.com/djbyrne>`
+
+    Train::
+
+        trainer = Trainer()
+        trainer.fit(model)
+
+    Args:
+        env: gym environment tag
+        gpus: number of gpus being used
+        eps_start: starting value of epsilon for the epsilon-greedy exploration
+        eps_end: final value of epsilon for the epsilon-greedy exploration
+        eps_last_frame: the final frame in for the decrease of epsilon. At this frame espilon = eps_end
+        sync_rate: the number of iterations between syncing up the target network with the train network
+        gamma: discount factor
+        lr: learning rate
+        batch_size: size of minibatch pulled from the DataLoader
+        replay_size: total capacity of the replay buffer
+        warm_start_size: how many random steps through the environment to be carried out at the start of
+            training to fill the buffer with a starting point
+        sample_len: the number of samples to pull from the dataset iterator and feed to the DataLoader
+
+    .. note::
+        This example is based on:
+         https://github.com/PacktPublishing/Deep-Reinforcement-Learning-Hands-On-Second-Edition\
+         /blob/master/Chapter08/03_dqn_double.py
+
+    .. note:: Currently only supports CPU and single GPU training with `distributed_backend=dp`
+
+    """
+
+    def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor], _) -> OrderedDict:
         """
-        Calculates the mse loss using a mini batch from the replay buffer. This uses an improvement to the original
-        DQN loss by using the double dqn. This is shown by using the actions of the train network to pick the
-        value from the target network. This code is heavily commented in order to explain the process clearly
+        Carries out a single step through the environment to update the replay buffer.
+        Then calculates loss based on the minibatch recieved
 
         Args:
             batch: current mini batch of replay data
+            _: batch number, not used
 
         Returns:
-            loss
+            Training loss and log metrics
         """
-        states, actions, rewards, dones, next_states = batch  # batch of experiences, batch_size = 16
+        self.agent.update_epsilon(self.global_step)
 
-        actions_v = actions.unsqueeze(-1)  # adds a dimension, 16 -> [16, 1]
-        output = self.net(states)  # shape [16, 2], [batch, action space]
+        # step through environment with agent and add to buffer
+        exp, reward, done = self.source.step(self.device)
+        self.buffer.append(exp)
 
-        # gather the value of the outputs according to the actions index from the batch
-        state_action_values = output.gather(1, actions_v).squeeze(-1)
+        self.episode_reward += reward
+        self.episode_steps += 1
 
-        # dont want to mess with gradients when using the target network
-        with torch.no_grad():
-            next_outputs = self.net(next_states)  # [16, 2], [batch, action_space]
+        # calculates training loss
+        loss = double_dqn_loss(batch, self.net, self.target_net)
 
-            next_state_acts = next_outputs.max(1)[1].unsqueeze(-1)  # take action at the index with the highest value
-            next_tgt_out = self.target_net(next_states)
+        if self.trainer.use_dp or self.trainer.use_ddp2:
+            loss = loss.unsqueeze(0)
 
-            # Take the value of the action chosen by the train network
-            next_state_values = next_tgt_out.gather(1, next_state_acts).squeeze(-1)
-            next_state_values[dones] = 0.0  # any steps flagged as done get a 0 value
-            next_state_values = next_state_values.detach()  # remove values from the graph, no grads needed
+        if done:
+            self.total_reward = self.episode_reward
+            self.reward_list.append(self.total_reward)
+            self.avg_reward = sum(self.reward_list[-100:]) / 100
+            self.episode_count += 1
+            self.episode_reward = 0
+            self.total_episode_steps = self.episode_steps
+            self.episode_steps = 0
 
-        # calc expected discounted return of next_state_values
-        expected_state_action_values = next_state_values * self.hparams.gamma + rewards
+        # Soft update of target network
+        if self.global_step % self.sync_rate == 0:
+            self.target_net.load_state_dict(self.net.state_dict())
 
-        # Standard MSE loss between the state action values of the current state and the
-        # expected state action values of the next state
-        return nn.MSELoss()(state_action_values, expected_state_action_values)
+        log = {
+            "total_reward": self.total_reward,
+            "avg_reward": self.avg_reward,
+            "train_loss": loss,
+            "episode_steps": self.total_episode_steps,
+        }
+        status = {
+            "steps": self.global_step,
+            "avg_reward": self.avg_reward,
+            "total_reward": self.total_reward,
+            "episodes": self.episode_count,
+            "episode_steps": self.episode_steps,
+            "epsilon": self.agent.epsilon,
+        }
+
+        return OrderedDict(
+            {
+                "loss": loss,
+                "avg_reward": self.avg_reward,
+                "log": log,
+                "progress_bar": status,
+            }
+        )
+
+
+# todo: covert to CLI func and add test
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(add_help=False)
+
+    # trainer args
+    parser = pl.Trainer.add_argparse_args(parser)
+
+    # model args
+    parser = cli.add_base_args(parser)
+    parser = DoubleDQN.add_model_specific_args(parser)
+    args = parser.parse_args()
+
+    model = DoubleDQN(**args.__dict__)
+
+    trainer = pl.Trainer.from_argparse_args(args)
+    trainer.fit(model)

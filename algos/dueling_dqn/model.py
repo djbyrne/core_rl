@@ -1,24 +1,68 @@
 """
-Deep Reinforcement Learning: Deep Q-network (DQN)
-This example is based on https://github.com/PacktPublishing/Deep-Reinforcement-Learning-Hands-On-
-Second-Edition/blob/master/Chapter06/02_dqn_pong.py
-The template illustrates using Lightning for Reinforcement Learning. The example builds a basic DQN using the
-classic CartPole environment.
-To run the template just run:
-python reinforce_learn_Qnet.py
-After ~1500 steps, you will see the total_reward hitting the max score of 200. Open up TensorBoard to
-see the metrics:
-tensorboard --logdir default
+Dueling DQN
 """
+import argparse
 
+import pytorch_lightning as pl
+
+from algos.common import cli
 from algos.common.networks import DuelingCNN
-from algos.dqn.model import DQNLightning
+from algos.dqn.model import DQN
 
 
-class DuelingDQNLightning(DQNLightning):
-    """ Dueling DQN Model """
+class DuelingDQN(DQN):
+    """
+        PyTorch Lightning implementation of `Dueling DQN <https://arxiv.org/abs/1511.06581>`_
+
+        Paper authors: Ziyu Wang, Tom Schaul, Matteo Hessel, Hado van Hasselt, Marc Lanctot, Nando de Freitas
+
+        Model implemented by:
+
+            - `Donal Byrne <https://github.com/djbyrne>`
+
+        Train::
+
+            trainer = Trainer()
+            trainer.fit(model)
+
+        Args:
+            env: gym environment tag
+            gpus: number of gpus being used
+            eps_start: starting value of epsilon for the epsilon-greedy exploration
+            eps_end: final value of epsilon for the epsilon-greedy exploration
+            eps_last_frame: the final frame in for the decrease of epsilon. At this frame espilon = eps_end
+            sync_rate: the number of iterations between syncing up the target network with the train network
+            gamma: discount factor
+            lr: learning rate
+            batch_size: size of minibatch pulled from the DataLoader
+            replay_size: total capacity of the replay buffer
+            warm_start_size: how many random steps through the environment to be carried out at the start of
+                training to fill the buffer with a starting point
+            sample_len: the number of samples to pull from the dataset iterator and feed to the DataLoader
+
+        .. note:: Currently only supports CPU and single GPU training with `distributed_backend=dp`
+
+        """
 
     def build_networks(self) -> None:
         """Initializes the Dueling DQN train and target networks"""
         self.net = DuelingCNN(self.obs_shape, self.n_actions)
         self.target_net = DuelingCNN(self.obs_shape, self.n_actions)
+
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(add_help=False)
+
+    # trainer args
+    parser = pl.Trainer.add_argparse_args(parser)
+
+    # model args
+    parser = cli.add_base_args(parser)
+    parser = DuelingDQN.add_model_specific_args(parser)
+    args = parser.parse_args()
+
+    model = DuelingDQN(**args.__dict__)
+
+    trainer = pl.Trainer.from_argparse_args(args)
+    trainer.fit(model)
